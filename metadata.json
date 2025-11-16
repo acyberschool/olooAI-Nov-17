@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of Voice First Kanban Copilot",
+  "description": "A SaaS web app where users talk to the system to manage all their work. Voice notes are transcribed, understood by AI, and converted into structured task cards on a Kanban board.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
