@@ -3,13 +3,12 @@
 import { GoogleGenAI } from "@google/genai";
 import { GeminiBlob, GeminiFunctionDeclaration, GeminiModality, GeminiType } from '../types';
 
-// FIX: Use process.env.API_KEY as per guidelines to resolve TypeScript error.
+// This is the correct way to access environment variables in this app.
 if (!process.env.API_KEY) {
-    // FIX: Updated error message to reflect the correct environment variable.
     console.error("API_KEY environment variable is not set. The app will display a configuration error message.");
 }
 
-// FIX: Use process.env.API_KEY as per guidelines to resolve TypeScript error.
+// Initialize the AI with the key from the environment variables.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
 // --- Audio Utility Functions ---

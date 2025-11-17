@@ -113,9 +113,7 @@ const routerBrainSchema = {
 };
 
 export const processTextMessage = async (text: string, knownData: any, context: any, platformActivitySummary: string): Promise<RouterBrainResult> => {
-    // FIX: Use process.env.API_KEY as per guidelines to resolve TypeScript error.
     if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-    // FIX: Use process.env.API_KEY as per guidelines to resolve TypeScript error.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const systemInstruction = getSystemPrompt(knownData, context, platformActivitySummary);
     

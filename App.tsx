@@ -27,6 +27,12 @@ declare global {
     interface Window {
         gtag: (...args: any[]) => void;
     }
+    // This will be populated by the environment
+    namespace NodeJS {
+        interface ProcessEnv {
+            API_KEY: string;
+        }
+    }
 }
 export const trackEvent = (action: string, category: string, label: string, value?: number) => {
     if (window.gtag) {
@@ -58,11 +64,9 @@ const ApiKeyMissingError = () => (
         <div className="max-w-2xl text-center bg-white p-8 rounded-xl shadow-2xl border border-red-200">
             <h1 className="text-3xl font-bold mb-4 text-red-900">Configuration Error</h1>
             <p className="text-lg mb-2 text-red-700">
-                {/* FIX: Use API_KEY as per guidelines */}
                 The application cannot start because the <strong>API_KEY</strong> is missing.
             </p>
             <p className="mb-6 text-red-600">
-                {/* FIX: Use API_KEY as per guidelines */}
                 To fix this, you need to set the `API_KEY` environment variable in your deployment service (e.g., Vercel, Netlify).
             </p>
             <div className="bg-red-50 p-4 rounded-lg text-left text-sm font-mono text-red-900">
@@ -71,7 +75,6 @@ const ApiKeyMissingError = () => (
                     <li>Go to your project's dashboard on Vercel.</li>
                     <li>Navigate to the <strong>Settings</strong> tab.</li>
                     <li>Click on <strong>Environment Variables</strong> in the side menu.</li>
-                    {/* FIX: Use API_KEY as per guidelines */}
                     <li>Add a new variable with the name <strong>API_KEY</strong> and paste your key in the value field.</li>
                     <li>Redeploy your application for the changes to take effect.</li>
                 </ol>
@@ -102,7 +105,6 @@ export default function App() {
   useEffect(() => {
     // A missing API key is a critical error, especially on deployment.
     // This prevents a blank screen and shows a helpful error message.
-    // FIX: Use process.env.API_KEY as per guidelines to resolve TypeScript error.
     if (!process.env.API_KEY) {
       setApiKeyMissing(true);
     }
