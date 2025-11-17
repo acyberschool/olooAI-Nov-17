@@ -53,8 +53,36 @@ const MenuIcon = () => (
     </svg>
 );
 
+const ApiKeyMissingError = () => (
+    <div className="flex items-center justify-center min-h-screen bg-red-50 text-red-800 p-4 font-sans">
+        <div className="max-w-2xl text-center bg-white p-8 rounded-xl shadow-2xl border border-red-200">
+            <h1 className="text-3xl font-bold mb-4 text-red-900">Configuration Error</h1>
+            <p className="text-lg mb-2 text-red-700">
+                The application cannot start because the <strong>API_KEY</strong> is missing.
+            </p>
+            <p className="mb-6 text-red-600">
+                To fix this, you need to set the `API_KEY` environment variable in your deployment service (e.g., Vercel, Netlify).
+            </p>
+            <div className="bg-red-50 p-4 rounded-lg text-left text-sm font-mono text-red-900">
+                <p className="font-semibold">Example Steps for Vercel:</p>
+                <ol className="list-decimal list-inside mt-2 space-y-1">
+                    <li>Go to your project's dashboard on Vercel.</li>
+                    <li>Navigate to the <strong>Settings</strong> tab.</li>
+                    <li>Click on <strong>Environment Variables</strong> in the side menu.</li>
+                    <li>Add a new variable with the name <strong>API_KEY</strong> and paste your key in the value field.</li>
+                    <li>Redeploy your application for the changes to take effect.</li>
+                </ol>
+            </div>
+            <p className="mt-6 text-sm text-red-600">
+                If you don't have a key, you can get one from <a href="https://makersuite.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold hover:text-red-800">Google AI Studio</a>.
+            </p>
+        </div>
+    </div>
+);
+
 
 export default function App() {
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   const [activeView, setActiveView] = useState<View>('homepage');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedBusinessLineId, setSelectedBusinessLineId] = useState<string | null>(null);
@@ -67,6 +95,14 @@ export default function App() {
 
   const [isUniversalInputOpen, setIsUniversalInputOpen] = useState(false);
   const [universalInputContext, setUniversalInputContext] = useState<UniversalInputContext>({});
+
+  useEffect(() => {
+    // A missing API key is a critical error, especially on deployment.
+    // This prevents a blank screen and shows a helpful error message.
+    if (!process.env.API_KEY) {
+      setApiKeyMissing(true);
+    }
+  }, []);
 
   const handleTurnComplete = (user: string, assistant: string) => {
     if (user || assistant) {
@@ -269,6 +305,10 @@ export default function App() {
           />;
     }
   };
+
+  if (apiKeyMissing) {
+    return <ApiKeyMissingError />;
+  }
 
   return (
     <div className="min-h-screen font-sans flex flex-col lg:flex-row bg-brevo-light-gray">

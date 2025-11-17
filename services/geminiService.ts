@@ -4,10 +4,10 @@ import { GoogleGenAI } from "@google/genai";
 import { GeminiBlob, GeminiFunctionDeclaration, GeminiModality, GeminiType } from '../types';
 
 if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set.");
+    console.error("API_KEY environment variable is not set. The app will display a configuration error message.");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
 // --- Audio Utility Functions ---
 
