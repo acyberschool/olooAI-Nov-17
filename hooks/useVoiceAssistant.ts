@@ -1,11 +1,9 @@
 
+
 import { useState, useRef, useCallback, useEffect } from 'react';
-// FIX: LiveSession is not exported from @google/genai. It will be derived from connectToLiveSession.
-import { LiveServerMessage } from '@google/genai';
 import { connectToLiveSession, decode, decodeAudioData, createPcmBlob } from '../services/geminiService';
 import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType } from '../types';
 
-// FIX: Define LiveSession type based on the return type of connectToLiveSession.
 type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
 interface UseVoiceAssistantProps {
@@ -13,9 +11,7 @@ interface UseVoiceAssistantProps {
   onCrmEntryCreate: (data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => string;
   onTaskUpdate: (taskTitle: string, newStatus: KanbanStatus) => string;
   onBusinessLineCreate: (data: Omit<BusinessLine, 'id'>) => Promise<string> | string;
-  // FIX: Update onClientCreate to not require businessLineId, as AI provides businessLineName.
   onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => string;
-  // FIX: Update onDealCreate to not require clientId or businessLineId, as AI provides names.
   onDealCreate: (data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string; clientId?: string; businessLineId?: string;}) => string;
   onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed - Won' | 'Closed - Lost') => string;
   onTurnComplete?: (userTranscript: string, assistantTranscript: string) => void;
@@ -89,12 +85,12 @@ export const useVoiceAssistant = ({
     }
   }, []);
 
-  const handleMessage = async (message: LiveServerMessage) => {
+  const handleMessage = async (message: any) => {
     setError(null);
 
     if (message.serverContent?.inputTranscription) {
         setUserTranscript((prev) => {
-            const next = prev + message.serverContent.inputTranscription.text;
+            const next = prev + (message.serverContent.inputTranscription.text || '');
             userTranscriptRef.current = next;
             return next;
         });
@@ -103,7 +99,7 @@ export const useVoiceAssistant = ({
       setIsThinking(false);
       setIsSpeaking(true);
       setAssistantTranscript((prev) => {
-          const next = prev + message.serverContent.outputTranscription.text;
+          const next = prev + (message.serverContent.outputTranscription.text || '');
           assistantTranscriptRef.current = next;
           return next;
       });
@@ -133,31 +129,25 @@ export const useVoiceAssistant = ({
         
         switch (fc.name) {
             case 'createCrmEntry':
-                // FIX: Cast finalArgs to the expected type for onCrmEntryCreate.
                 result = onCrmEntryCreate(finalArgs as { interactionType: CRMEntryType; content: string; clientName?: string; dealName?: string });
                 break;
             case 'createBoardItem':
                 result = onBoardItemCreate(finalArgs);
                 break;
             case 'moveTask':
-                // FIX: Cast taskTitle to string to resolve type error.
                 result = onTaskUpdate(finalArgs.taskTitle as string, finalArgs.newStatus as KanbanStatus);
                 break;
             case 'createBusinessLine':
-                // FIX: Cast finalArgs to the expected type for onBusinessLineCreate.
                 result = onBusinessLineCreate(finalArgs as Omit<BusinessLine, 'id'>);
                 break;
             case 'createClient':
-                // FIX: Cast finalArgs to the expected type for onClientCreate, which doesn't expect a businessLineId.
                 result = onClientCreate(finalArgs as Omit<Client, 'id' | 'businessLineId'> & { businessLineName?: string });
                 break;
             case 'createDeal':
-                // FIX: Cast finalArgs to the expected type for onDealCreate, which doesn't expect IDs.
                 result = onDealCreate(finalArgs as Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string});
                 break;
             case 'updateDealStatus':
                 if (currentDealId) { // Should only be called from within a deal
-                    // FIX: Cast newStatus to the expected literal type.
                     result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as 'Open' | 'Closed - Won' | 'Closed - Lost');
                 } else {
                     result = "I can only change the status of a deal you are currently viewing.";
@@ -165,7 +155,6 @@ export const useVoiceAssistant = ({
                 break;
             case 'findProspects':
                 if (onFindProspects) {
-                    // FIX: Cast finalArgs to the expected type for onFindProspects.
                     result = onFindProspects(finalArgs as { businessLineName: string });
                 }
                 break;
@@ -232,14 +221,17 @@ export const useVoiceAssistant = ({
         nextStartTimeRef.current = 0;
         
         const context = { currentBusinessLineId, currentClientId, currentDealId };
-        const systemInstruction = `You are Walter, a proactive, intelligent assistant for managing a Kanban board and CRM. Your primary job is to take action based on user commands, even with incomplete information. Prioritize action over asking for clarification.
-- Differentiate between logging past events (e.g., "I talked to...") using 'createCrmEntry', and scheduling future actions (e.g., "Remind me to...") using 'createBoardItem'.
-- If details are missing for a function call, use the available context and data to make a reasonable assumption and proceed. For example, if a business line isn't specified for a new client, a default will be chosen for you.
-- Never ask follow-up questions. Assume and act. The user can always edit the results later.
-- Announce any assumptions you make in your spoken confirmation. For example: 'Okay, I've created the client "New Corp" under the "Fumigation" business line.'
-- Keep your spoken responses brief, confident, and action-oriented.
-- CONTEXT: User is currently viewing: ${JSON.stringify(context)}.
-- CONTEXT: Recent platform activity: ${platformActivitySummary || 'None.'}`;
+        const systemInstruction = `You are Walter, a world-class business assistant. Your primary directive is to be an intelligent and collaborative partner.
+
+1.  **Listen and Clarify**: Listen carefully. If a command is ambiguous, ask for clarification. For example, if a user says "create a deal," ask "Which client is this deal for?".
+2.  **Act Intelligently with Context**: Use the provided context (the user's current view) to link new items. For example, if they're viewing "ABC Limited" and say "add a task to call John", automatically link that task to "ABC Limited".
+3.  **Confirm Your Actions**: After creating an item using context, always confirm what you've done and ask if it's correct. For example: "Okay, I've created the client 'New Corp'. I've put them under the 'Fumigation' business line, is that right?". This gives the user a chance to correct you.
+4.  **Function Differentiation**:
+    - Use 'createCrmEntry' for logging past events (e.g., "I just called...").
+    - Use 'createBoardItem' for future actions (e.g., "Remind me to call...").
+5.  **Be Concise**: Keep your spoken responses brief and to the point.
+- CURRENT CONTEXT: The user is viewing: ${JSON.stringify(context)}. Use this to link new items.
+- RECENT ACTIVITY (for your learning): ${platformActivitySummary || 'None.'}`;
 
         sessionPromiseRef.current = connectToLiveSession({
             onOpen: () => {

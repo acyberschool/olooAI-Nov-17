@@ -1,7 +1,7 @@
 
 
-// FIX: Remove LiveSession, ErrorEvent, and CloseEvent from the import as they are not exported from @google/genai.
-import { GoogleGenAI, Modality, Type, FunctionDeclaration, Blob, LiveServerMessage } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
+import { GeminiBlob, GeminiFunctionDeclaration, GeminiModality, GeminiType } from '../types';
 
 if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set.");
@@ -49,7 +49,7 @@ export async function decodeAudioData(
   return buffer;
 }
 
-export function createPcmBlob(data: Float32Array): Blob {
+export function createPcmBlob(data: Float32Array): GeminiBlob {
     const l = data.length;
     const int16 = new Int16Array(l);
     for (let i = 0; i < l; i++) {
@@ -64,38 +64,38 @@ export function createPcmBlob(data: Float32Array): Blob {
 
 // --- Function Calling Schemas ---
 
-const findProspectsDeclaration: FunctionDeclaration = {
+const findProspectsDeclaration: GeminiFunctionDeclaration = {
     name: 'findProspects',
     parameters: {
-        type: Type.OBJECT,
+        type: GeminiType.OBJECT,
         description: 'Searches for potential new clients based on a business line\'s profile.',
         properties: {
-            businessLineName: { type: Type.STRING, description: 'The name of the business line to find prospects for.' },
+            businessLineName: { type: GeminiType.STRING, description: 'The name of the business line to find prospects for.' },
         },
         required: ['businessLineName'],
     },
 };
 
-const createCrmEntryDeclaration: FunctionDeclaration = {
+const createCrmEntryDeclaration: GeminiFunctionDeclaration = {
   name: 'createCrmEntry',
   parameters: {
-    type: Type.OBJECT,
+    type: GeminiType.OBJECT,
     description: 'Logs a past interaction (like a call, email, or meeting) to a client\'s CRM timeline. Use this for events that have already happened. For future actions, use createBoardItem.',
     properties: {
       interactionType: { 
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The type of interaction. Infer from the user\'s language. Must be one of: "call", "email", "meeting", "message", "note".'
       },
       content: { 
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The full details of the interaction as described by the user.'
       },
       clientName: { 
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The name of the client involved in the interaction.'
       },
       dealName: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'Optional: The name of the deal this interaction is related to.'
       },
     },
@@ -104,42 +104,42 @@ const createCrmEntryDeclaration: FunctionDeclaration = {
 };
 
 
-const createBoardItemDeclaration: FunctionDeclaration = {
+const createBoardItemDeclaration: GeminiFunctionDeclaration = {
   name: 'createBoardItem',
   parameters: {
-    type: Type.OBJECT,
+    type: GeminiType.OBJECT,
     description: 'Creates a new item (task, reminder, or meeting) and adds it to the "To Do" column of the Kanban board, based on the user\'s voice command. Infer the item type from the user\'s phrasing, e.g., "remind me to..." implies a Reminder, "meeting with..." implies a Meeting, otherwise it is a Task.',
     properties: {
       itemType: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The type of item to create. Must be one of: "Task", "Reminder", "Meeting".',
       },
       title: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'A short, human-friendly title for the item. E.g., for a task "Call James", for a reminder "Send the invoice", for a meeting "Project sync with the team".',
       },
       description: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'Optional, longer description of the item from the user’s voice.',
       },
       dueDate: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The due date and time for the item in ISO 8601 format, parsed from what the user said (e.g., "tomorrow at 3pm").',
       },
       priority: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The priority of the item. Can be "Low", "Medium", or "High".',
       },
       clientName: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The name of the client this item is for. E.g., "ABC Limited".',
       },
       dealName: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The name of the deal this item is related to. E.g., "Warehouse monthly fumigation".',
       },
       businessLineName: {
-        type: Type.STRING,
+        type: GeminiType.STRING,
         description: 'The name of the business line for this item. E.g., "Fumigation".',
       },
     },
@@ -147,18 +147,18 @@ const createBoardItemDeclaration: FunctionDeclaration = {
   },
 };
 
-const moveTaskDeclaration: FunctionDeclaration = {
+const moveTaskDeclaration: GeminiFunctionDeclaration = {
     name: 'moveTask',
     parameters: {
-        type: Type.OBJECT,
+        type: GeminiType.OBJECT,
         description: 'Moves an existing task to a different column on the Kanban board.',
         properties: {
             taskTitle: {
-                type: Type.STRING,
+                type: GeminiType.STRING,
                 description: 'The title of the task to move. The model should try to match this to an existing task.',
             },
             newStatus: {
-                type: Type.STRING,
+                type: GeminiType.STRING,
                 description: 'The new status for the task. Must be one of: "To Do", "Doing", "Done", "Terminated".',
             },
         },
@@ -166,61 +166,61 @@ const moveTaskDeclaration: FunctionDeclaration = {
     },
 };
 
-const createBusinessLineDeclaration: FunctionDeclaration = {
+const createBusinessLineDeclaration: GeminiFunctionDeclaration = {
   name: 'createBusinessLine',
   parameters: {
-    type: Type.OBJECT,
+    type: GeminiType.OBJECT,
     description: 'Creates a new business line from user input, parsing out the key details.',
     properties: {
-      name: { type: Type.STRING, description: 'The name of the new business line. Example: "Fumigation".' },
-      description: { type: Type.STRING, description: 'A one-sentence description of what the business line does. Example: "We help apartments and offices get rid of pests."' },
-      customers: { type: Type.STRING, description: 'A one-sentence description of the typical customers. Example: "Apartments, estates, and small offices in Nairobi."' },
-      aiFocus: { type: Type.STRING, description: 'A one-sentence description of what the AI should focus on for this line. Example: "Find estate-wide contracts and upsell to annual plans."' },
+      name: { type: GeminiType.STRING, description: 'The name of the new business line. Example: "Fumigation".' },
+      description: { type: GeminiType.STRING, description: 'A one-sentence description of what the business line does. Example: "We help apartments and offices get rid of pests."' },
+      customers: { type: GeminiType.STRING, description: 'A one-sentence description of the typical customers. Example: "Apartments, estates, and small offices in Nairobi."' },
+      aiFocus: { type: GeminiType.STRING, description: 'A one-sentence description of what the AI should focus on for this line. Example: "Find estate-wide contracts and upsell to annual plans."' },
     },
     required: ['name', 'description', 'customers', 'aiFocus'],
   },
 };
 
-const createClientDeclaration: FunctionDeclaration = {
+const createClientDeclaration: GeminiFunctionDeclaration = {
   name: 'createClient',
   parameters: {
-    type: Type.OBJECT,
+    type: GeminiType.OBJECT,
     description: 'Creates a new client and links it to a business line.',
     properties: {
-      name: { type: Type.STRING, description: 'The name of the new client. Example: "ABC Limited".' },
-      description: { type: Type.STRING, description: 'A one-sentence description of who the client is. Example: "A large logistics company with multiple warehouses."' },
-      aiFocus: { type: Type.STRING, description: 'A one-sentence description of what the AI should focus on for this client. Example: "Focus on securing a multi-year contract."' },
-      businessLineName: { type: Type.STRING, description: 'Optional: The name of the business line to associate this client with. If omitted, a sensible default will be chosen.' },
+      name: { type: GeminiType.STRING, description: 'The name of the new client. Example: "ABC Limited".' },
+      description: { type: GeminiType.STRING, description: 'A one-sentence description of who the client is. Example: "A large logistics company with multiple warehouses."' },
+      aiFocus: { type: GeminiType.STRING, description: 'A one-sentence description of what the AI should focus on for this client. Example: "Focus on securing a multi-year contract."' },
+      businessLineName: { type: GeminiType.STRING, description: 'Optional: The name of the business line to associate this client with. If omitted, a sensible default will be chosen.' },
     },
     required: ['name', 'description', 'aiFocus'],
   },
 };
 
-const createDealDeclaration: FunctionDeclaration = {
+const createDealDeclaration: GeminiFunctionDeclaration = {
   name: 'createDeal',
   parameters: {
-    type: Type.OBJECT,
+    type: GeminiType.OBJECT,
     description: 'Creates a new deal and links it to an existing client.',
     properties: {
-      name: { type: Type.STRING, description: 'The name of the new deal.' },
-      description: { type: Type.STRING, description: 'A short, one-sentence description of what the deal is about.' },
-      clientName: { type: Type.STRING, description: 'The name of the client this deal belongs to.' },
-      value: { type: Type.NUMBER, description: 'The total monetary value of the deal.' },
-      currency: { type: Type.STRING, description: 'The currency of the deal value (e.g., USD, KES).' },
-      revenueModel: { type: Type.STRING, description: 'The revenue model for the deal. Must be one of: "Revenue Share", "Full Pay".' },
+      name: { type: GeminiType.STRING, description: 'The name of the new deal.' },
+      description: { type: GeminiType.STRING, description: 'A short, one-sentence description of what the deal is about.' },
+      clientName: { type: GeminiType.STRING, description: 'The name of the client this deal belongs to.' },
+      value: { type: GeminiType.NUMBER, description: 'The total monetary value of the deal.' },
+      currency: { type: GeminiType.STRING, description: 'The currency of the deal value (e.g., USD, KES).' },
+      revenueModel: { type: GeminiType.STRING, description: 'The revenue model for the deal. Must be one of: "Revenue Share", "Full Pay".' },
     },
     required: ['name', 'description', 'clientName', 'value', 'currency', 'revenueModel'],
   },
 };
 
-const updateDealStatusDeclaration: FunctionDeclaration = {
+const updateDealStatusDeclaration: GeminiFunctionDeclaration = {
     name: 'updateDealStatus',
     parameters: {
-        type: Type.OBJECT,
+        type: GeminiType.OBJECT,
         description: "Updates a deal's status to 'Open' or 'Closed - Won' or 'Closed - Lost'.",
         properties: {
-            dealName: { type: Type.STRING, description: 'The name of the deal to update.' },
-            newStatus: { type: Type.STRING, description: "The new status for the deal. Must be 'Open', 'Closed - Won', or 'Closed - Lost'." },
+            dealName: { type: GeminiType.STRING, description: 'The name of the deal to update.' },
+            newStatus: { type: GeminiType.STRING, description: "The new status for the deal. Must be 'Open', 'Closed - Won', or 'Closed - Lost'." },
         },
         required: ['dealName', 'newStatus'],
     },
@@ -241,15 +241,14 @@ const assistantTools = [{ functionDeclarations: [
 
 interface LiveSessionCallbacks {
     onOpen: () => void;
-    onMessage: (message: LiveServerMessage) => void;
+    onMessage: (message: any) => void;
     onError: (event: ErrorEvent) => void;
     onClose: (event: CloseEvent) => void;
 }
 
-// FIX: Refactor to accept dynamic system instructions and conditionally include tools.
 export function connectToLiveSession(callbacks: LiveSessionCallbacks, systemInstruction: string, useTools: boolean = true) {
     const config: any = {
-        responseModalities: [Modality.AUDIO],
+        responseModalities: [GeminiModality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
         inputAudioTranscription: {},
         outputAudioTranscription: {},

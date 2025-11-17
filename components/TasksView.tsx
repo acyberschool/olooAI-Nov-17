@@ -1,9 +1,13 @@
+
+
 import React, { useState, useMemo } from 'react';
 import { Task, KanbanStatus, BusinessLine, Client, Deal } from '../types';
 import KanbanBoard from './KanbanBoard';
 import CalendarView from './CalendarView';
 import Tabs from './Tabs';
 import { UniversalInputContext } from '../App';
+import PerformanceSnapshot from './PerformanceSnapshot';
+import { useKanban } from '../hooks/useKanban';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -16,6 +20,7 @@ interface TasksViewProps {
   onSelectDeal: (id: string) => void;
   onSelectTask: (task: Task) => void;
   onOpenUniversalInput: (context: UniversalInputContext) => void;
+  kanbanApi: ReturnType<typeof useKanban>;
 }
 
 type HomepageTab = 'Today' | 'All tasks' | 'Deals' | 'Clients';
@@ -79,6 +84,11 @@ const TodayTab: React.FC<TasksViewProps> = (props) => {
 
     return (
         <div className="space-y-8">
+            <PerformanceSnapshot 
+                deals={props.deals}
+                tasks={props.tasks}
+                insights={props.kanbanApi.getPlatformInsights()}
+            />
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-brevo-text-primary">What's on for today</h3>

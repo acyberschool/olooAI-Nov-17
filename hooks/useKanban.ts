@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, PlatformInsight, FilterOptions } from '../types';
+import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, PlatformInsight, FilterOptions, GeminiType } from '../types';
 import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries } from '../data/mockData';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { processTextMessage } from '../services/routerBrainService';
 import { trackEvent } from '../App';
 
@@ -59,12 +59,12 @@ export const useKanban = () => {
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING }
+                    type: GeminiType.ARRAY,
+                    items: { type: GeminiType.STRING }
                 }
             }
         });
-        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        let jsonString = response.text.trim();
         const subTaskTexts: string[] = JSON.parse(jsonString);
         
         const subTasks = subTaskTexts.map((text, index) => ({
@@ -135,12 +135,12 @@ export const useKanban = () => {
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: Type.ARRAY,
+                    type: GeminiType.ARRAY,
                     items: {
-                        type: Type.OBJECT,
+                        type: GeminiType.OBJECT,
                         properties: {
-                            title: { type: Type.STRING },
-                            description: { type: Type.STRING },
+                            title: { type: GeminiType.STRING },
+                            description: { type: GeminiType.STRING },
                         },
                         required: ["title", "description"],
                     },
@@ -348,8 +348,26 @@ export const useKanban = () => {
             prompt += `- There is no standard playbook. Use your vast knowledge of business processes to figure out the best next step.`
         }
         
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        // FIX: Added responseMimeType and responseSchema to ensure reliable JSON parsing.
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: GeminiType.ARRAY,
+                    items: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            text: { type: GeminiType.STRING },
+                            taskTitle: { type: GeminiType.STRING }
+                        },
+                        required: ["text", "taskTitle"]
+                    }
+                }
+            }
+        });
+        let jsonString = response.text.trim();
         const suggestionsRaw = JSON.parse(jsonString);
         const newSuggestions: Suggestion[] = suggestionsRaw.map((s: any) => ({
             id: `sugg-${Date.now()}-${Math.random()}`,
@@ -437,72 +455,103 @@ export const useKanban = () => {
     }
   }, []);
   
-  const getOpportunities = useCallback(async (businessLine: BusinessLine, expand: boolean = false): Promise<Opportunity[]> => {
+  const getOpportunities = useCallback(async (businessLine: BusinessLine, expand: boolean = false): Promise<{ opportunities: Opportunity[], sources: any[] }> => {
     try {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Based on the following business line, perform a deep search online for additional insights, then provide 3 simple, actionable opportunities. State that the suggestion is based on your knowledge and external research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings. For example: ["Based on my knowledge and recent market trends, you should..."]\n\nName: ${businessLine.name}\nDescription: ${businessLine.description}\nCustomers: ${businessLine.customers}\nAI Focus: ${businessLine.aiFocus}`;
+        const prompt = `You are a top-tier business strategist. Analyze the following business line, perform a deep web search for market trends and news, and generate 3 highly specific and creative business opportunities. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
+Example: ["Partner with local real estate agencies for a 'new tenant welcome package', as recent articles show a boom in rental property occupancy."]
+
+Business Line Information:
+Name: ${businessLine.name}
+Description: ${businessLine.description}
+Customers: ${businessLine.customers}
+AI Focus: ${businessLine.aiFocus}`;
+        
         const response = await ai.models.generateContent({ 
-            model: 'gemini-2.5-flash', 
+            model: 'gemini-2.5-pro',
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+                // FIX: `responseMimeType` and `responseSchema` are not allowed when using the `googleSearch` tool.
+                tools: [{googleSearch: {}}],
             }
         });
+
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        
         let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
         const ideas: string[] = JSON.parse(jsonString);
-        return ideas.map((idea, index) => ({ id: `opp-${Date.now()}-${index}`, text: idea }));
+        
+        const opportunities = ideas.map((idea, index) => ({ id: `opp-${Date.now()}-${index}`, text: idea }));
+        return { opportunities, sources: groundingChunks.map((chunk: any) => chunk.web) };
+
     } catch (e) {
         console.error("Error getting opportunities:", e);
-        return [{ id: 'opp-error', text: "Sorry, I had trouble generating opportunities right now. Try again." }];
+        return { opportunities: [{ id: 'opp-error', text: "Sorry, I had trouble generating opportunities right now. Try again." }], sources: [] };
     }
   }, []);
   
-  const getClientOpportunities = useCallback(async (client: Client, expand: boolean = false): Promise<Opportunity[]> => {
+  const getClientOpportunities = useCallback(async (client: Client, expand: boolean = false): Promise<{ opportunities: Opportunity[], sources: any[] }> => {
     try {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const businessLine = businessLines.find(bl => bl.id === client.businessLineId);
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Based on the following client, perform a deep search online for news and trends related to them, then provide 3 simple, actionable opportunities to grow the business relationship. State that the suggestion is based on your knowledge and external research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.\n\nClient Name: ${client.name}\nDescription: ${client.description}\nBusiness Line: ${businessLine?.name}\nAI Focus: ${client.aiFocus}`;
+        const prompt = `You are a top-tier business strategist. Analyze the following client, perform a deep web search for news and trends related to them, and generate 3 simple, actionable opportunities to grow the business relationship. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
+Client Name: ${client.name}
+Description: ${client.description}
+Business Line: ${businessLine?.name}
+AI Focus: ${client.aiFocus}`;
+
         const response = await ai.models.generateContent({ 
-            model: 'gemini-2.5-flash', 
+            model: 'gemini-2.5-pro', 
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+                // FIX: `responseMimeType` and `responseSchema` are not allowed when using the `googleSearch` tool.
+                tools: [{googleSearch: {}}],
             }
         });
+
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
         let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
         const ideas: string[] = JSON.parse(jsonString);
-        return ideas.map((idea, index) => ({ id: `opp-client-${Date.now()}-${index}`, text: idea }));
+
+        const opportunities = ideas.map((idea, index) => ({ id: `opp-client-${Date.now()}-${index}`, text: idea }));
+        return { opportunities, sources: groundingChunks.map((chunk: any) => chunk.web) };
     } catch (e) {
         console.error("Error getting client opportunities:", e);
-        return [{ id: 'opp-client-error', text: "Sorry, I had trouble generating opportunities for this client right now." }];
+        return { opportunities: [{ id: 'opp-client-error', text: "Sorry, I had trouble generating opportunities for this client right now." }], sources: [] };
     }
   }, [businessLines]);
   
-  const getDealOpportunities = useCallback(async (deal: Deal, expand: boolean = false): Promise<Opportunity[]> => {
+  const getDealOpportunities = useCallback(async (deal: Deal, expand: boolean = false): Promise<{ opportunities: Opportunity[], sources: any[] }> => {
     try {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const client = clients.find(c => c.id === deal.clientId);
         const businessLine = businessLines.find(bl => bl.id === deal.businessLineId);
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Based on the following deal, perform a deep search online for industry trends, then provide 3 simple, actionable next steps or upsell opportunities. State that the suggestion is based on your knowledge and external research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.\n\nDeal Name: ${deal.name}\nDescription: ${deal.description}\nStatus: ${deal.status}\nClient: ${client?.name}\nBusiness Line: ${businessLine?.name}`;
+        const prompt = `You are a top-tier business strategist. Based on the following deal, perform a deep web search for industry trends, and generate 3 simple, actionable next steps or upsell opportunities. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
+Deal Name: ${deal.name}
+Description: ${deal.description}
+Status: ${deal.status}
+Client: ${client?.name}
+Business Line: ${businessLine?.name}`;
         const response = await ai.models.generateContent({ 
-            model: 'gemini-2.5-flash', 
+            model: 'gemini-2.5-pro', 
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+                // FIX: `responseMimeType` and `responseSchema` are not allowed when using the `googleSearch` tool.
+                tools: [{googleSearch: {}}],
             }
         });
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
         let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
         const ideas: string[] = JSON.parse(jsonString);
-        return ideas.map((idea, index) => ({ id: `opp-deal-${Date.now()}-${index}`, text: idea }));
+
+        const opportunities = ideas.map((idea, index) => ({ id: `opp-deal-${Date.now()}-${index}`, text: idea }));
+        return { opportunities, sources: groundingChunks.map((chunk: any) => chunk.web) };
     } catch (e) {
         console.error("Error getting deal opportunities:", e);
-        return [{ id: 'opp-deal-error', text: "Sorry, I had trouble generating opportunities for this deal right now." }];
+        return { opportunities: [{ id: 'opp-deal-error', text: "Sorry, I had trouble generating opportunities for this deal right now." }], sources: [] };
     }
   }, [clients, businessLines]);
 
@@ -565,31 +614,27 @@ export const useKanban = () => {
     return 'Could not find deal to log payment.';
   }, []);
 
-  const findProspects = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<Prospect[]> => {
+  const findProspects = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<{ prospects: Prospect[], sources: any[] }> => {
     try {
       if (!process.env.API_KEY) throw new Error("API Key is not configured.");
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = customPrompt || `Based on my business line "${businessLine.name}" (${businessLine.description}), perform a deep search online, then find 5 potential new clients. For each, provide a name and a likely need. Explicitly state this is based on both your internal knowledge and external research. Return ONLY a valid JSON array of objects, where each object has "name" and "likelyNeed".`;
+      const prompt = customPrompt || `You are a business development expert. Based on my business line "${businessLine.name}" (${businessLine.description}), perform a deep web search to find 5 potential new clients. For each, provide a name and a likely need, explaining your reasoning. Return ONLY a valid JSON array of objects, where each object has "name" and "likelyNeed".`;
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-pro',
         contents: prompt,
         config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: { name: { type: Type.STRING }, likelyNeed: { type: Type.STRING } },
-              required: ['name', 'likelyNeed'],
-            },
-          },
+          // FIX: `responseMimeType` and `responseSchema` are not allowed when using the `googleSearch` tool.
+          tools: [{googleSearch: {}}],
         },
       });
+
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const prospectsRaw = JSON.parse(response.text.trim());
-      return prospectsRaw.map((p: any, i: number) => ({ ...p, id: `prospect-${Date.now()}-${i}` }));
+      const prospects = prospectsRaw.map((p: any, i: number) => ({ ...p, id: `prospect-${Date.now()}-${i}` }));
+      return { prospects, sources: groundingChunks.map((chunk: any) => chunk.web) };
     } catch (e) {
       console.error("Error finding prospects:", e);
-      return [];
+      return { prospects: [], sources: [] };
     }
   }, []);
 
@@ -599,7 +644,7 @@ export const useKanban = () => {
         return `I couldn't find a business line named "${businessLineName}".`;
     }
     try {
-        const prospects = await findProspects(businessLine);
+        const { prospects } = await findProspects(businessLine);
         if (prospects.length === 0) {
             return `I couldn't find any new prospects for "${businessLineName}" right now.`;
         }
@@ -635,10 +680,10 @@ export const useKanban = () => {
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+                responseSchema: { type: GeminiType.ARRAY, items: { type: GeminiType.STRING } }
             }
         });
-        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        let jsonString = response.text.trim();
         return JSON.parse(jsonString);
     } catch (e) {
         console.error("Error generating social media ideas:", e);
@@ -721,13 +766,33 @@ export const useKanban = () => {
     await generateAndAddPlaybook(businessLine);
   }, [generateAndAddPlaybook]);
 
-  const getClientPulse = useCallback(async (client: Client, filters: FilterOptions): Promise<ClientPulse[]> => {
+  const getClientPulse = useCallback(async (client: Client, filters: FilterOptions, customPrompt?: string): Promise<ClientPulse[]> => {
     try {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Based on external research, find recent public social media posts or news articles mentioning "${client.name}". Apply the following filters: ${JSON.stringify(filters)}. For each result, provide the source, content snippet, a URL, and a date. Return ONLY a valid JSON array of objects with keys: "source", "content", "url", "date".`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        const prompt = customPrompt || `Based on external research, find recent public social media posts or news articles mentioning "${client.name}". Apply the following filters: ${JSON.stringify(filters)}. For each result, provide the source, content snippet, a URL, and a date. Return ONLY a valid JSON array of objects with keys: "source", "content", "url", "date".`;
+        // FIX: Added responseMimeType and responseSchema to ensure reliable JSON parsing.
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: GeminiType.ARRAY,
+                    items: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            source: { type: GeminiType.STRING },
+                            content: { type: GeminiType.STRING },
+                            url: { type: GeminiType.STRING },
+                            date: { type: GeminiType.STRING }
+                        },
+                        required: ["source", "content", "url", "date"]
+                    }
+                }
+            }
+        });
+        let jsonString = response.text.trim();
         const pulseItems: Omit<ClientPulse, 'id'>[] = JSON.parse(jsonString);
         return pulseItems.map((item, index) => ({ ...item, id: `pulse-${Date.now()}-${index}` }));
     } catch (e) {
@@ -736,16 +801,52 @@ export const useKanban = () => {
     }
   }, []);
 
-  const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: FilterOptions): Promise<{ insights: CompetitorInsight[], trends: SearchTrend[] }> => {
+  const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: FilterOptions, customPrompt?: string): Promise<{ insights: CompetitorInsight[], trends: SearchTrend[] }> => {
     try {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `For a business in "${businessLine.name}", perform a deep search online. Apply these filters: ${JSON.stringify(filters)}.
+        const prompt = customPrompt || `For a business in "${businessLine.name}", perform a deep search online. Apply these filters: ${JSON.stringify(filters)}.
         1. Identify 2-3 key competitors and provide a recent insight for each.
         2. Identify 2-3 recent customer search trends related to this business.
         Return ONLY a valid JSON object with two keys: "insights" (an array of objects with "competitorName", "insight", "source") and "trends" (an array of objects with "keyword", "insight").`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        // FIX: Added responseMimeType and responseSchema to ensure reliable JSON parsing.
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: GeminiType.OBJECT,
+                    properties: {
+                        insights: {
+                            type: GeminiType.ARRAY,
+                            items: {
+                                type: GeminiType.OBJECT,
+                                properties: {
+                                    competitorName: { type: GeminiType.STRING },
+                                    insight: { type: GeminiType.STRING },
+                                    source: { type: GeminiType.STRING }
+                                },
+                                required: ["competitorName", "insight", "source"]
+                            }
+                        },
+                        trends: {
+                            type: GeminiType.ARRAY,
+                            items: {
+                                type: GeminiType.OBJECT,
+                                properties: {
+                                    keyword: { type: GeminiType.STRING },
+                                    insight: { type: GeminiType.STRING }
+                                },
+                                required: ["keyword", "insight"]
+                            }
+                        }
+                    },
+                    required: ["insights", "trends"]
+                }
+            }
+        });
+        let jsonString = response.text.trim();
         const results = JSON.parse(jsonString);
         return {
             insights: results.insights.map((item: any, i: number) => ({...item, id: `ci-${Date.now()}-${i}`})),

@@ -143,14 +143,14 @@ const PlaybookTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, play
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                 <p className="text-sm text-brevo-text-secondary">This is your standard journey. The AI uses it to suggest next steps for your deals.</p>
-                <div className="flex items-center space-x-2">
-                    <button onClick={handleGenerate} disabled={isGenerating} className="flex items-center text-sm bg-gray-100 text-brevo-cta font-bold py-2 px-3 rounded-lg transition-colors hover:bg-gray-200">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <button onClick={handleGenerate} disabled={isGenerating} className="flex items-center justify-center text-sm bg-gray-100 text-brevo-cta font-bold py-2 px-3 rounded-lg transition-colors hover:bg-gray-200">
                        {isGenerating ? 'Generating...' : 'Ask AI to generate playbook'}
                     </button>
                     {playbook && (
-                        <button onClick={() => setIsPlaybookEditorOpen(true)} className="flex items-center text-sm bg-gray-100 text-brevo-cta font-bold py-2 px-3 rounded-lg transition-colors hover:bg-gray-200">
+                        <button onClick={() => setIsPlaybookEditorOpen(true)} className="flex items-center justify-center text-sm bg-gray-100 text-brevo-cta font-bold py-2 px-3 rounded-lg transition-colors hover:bg-gray-200">
                             <EditIcon /> Edit Playbook
                         </button>
                     )}
@@ -199,14 +199,16 @@ const DocumentsTab: React.FC<BusinessLineDetailViewProps> = ({ documents, busine
 
 const RevenueIdeasTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, deals, kanbanApi }) => {
     const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+    const [opportunitySources, setOpportunitySources] = useState<any[]>([]);
     const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
     
     const totalRevenue = deals.filter(d => d.status === 'Closed - Won').reduce((sum, deal) => sum + deal.value, 0);
 
     const handleGetOpportunities = async (expand = false) => {
         setIsLoadingOpportunities(true);
-        const result = await kanbanApi.getOpportunities(businessLine, expand);
+        const { opportunities: result, sources } = await kanbanApi.getOpportunities(businessLine, expand);
         setOpportunities(result);
+        setOpportunitySources(sources);
         setIsLoadingOpportunities(false);
     };
 
@@ -263,6 +265,20 @@ const RevenueIdeasTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, 
                             </li>
                         ))}
                         </ul>
+                        {opportunitySources.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                                <h5 className="text-xs font-semibold uppercase text-brevo-text-secondary tracking-wider">Sources from Walter's Research</h5>
+                                <ul className="list-disc list-inside text-xs mt-2 space-y-1">
+                                    {opportunitySources.map((source: any, index: number) => (
+                                        <li key={source.uri || index} className="text-blue-600 truncate">
+                                            <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline" title={source.uri}>
+                                                {source.title || source.uri}
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

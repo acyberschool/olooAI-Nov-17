@@ -1,16 +1,15 @@
+
 import React, { useState, useRef } from 'react';
 import { Document, DocumentCategory, DocumentOwnerType, BusinessLine, Client, Deal } from '../types';
 import AiDocGenerator from './AiDocGenerator';
 import { useKanban } from '../hooks/useKanban';
-// FIX: Import the 'Tabs' component.
-import Tabs from './Tabs';
 
 interface DocumentManagerProps {
   documents: Document[];
   owner: BusinessLine | Client | Deal;
   ownerType: DocumentOwnerType;
   kanbanApi: ReturnType<typeof useKanban>;
-  onAddDocument: (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => void;
+  onAddDocument: (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => Document;
   onDeleteDocument: (docId: string) => void;
 }
 
@@ -22,7 +21,6 @@ const GoogleDriveIcon = () => (<svg className="w-5 h-5 mr-2" viewBox="0 0 24 24"
 
 
 const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, owner, ownerType, kanbanApi, onAddDocument, onDeleteDocument }) => {
-  const [activeTab, setActiveTab] = useState<string>('Local');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDriveConnected, setIsDriveConnected] = useState(false);
 
@@ -45,25 +43,24 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, owner, own
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
-      <div className="flex justify-between items-center mb-4">
-          <Tabs tabs={isDriveConnected ? ['Local', 'Google Drive'] : ['Local']} activeTab={activeTab} setActiveTab={setActiveTab} />
-        <div>
-            {!isDriveConnected && <button onClick={() => setIsDriveConnected(true)} className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"><GoogleDriveIcon /> Connect Google Drive</button>}
-            {isDriveConnected && activeTab === 'Google Drive' && <button onClick={() => onAddDocument({name: 'New Google Doc', content:''}, 'Templates', owner.id, ownerType)} className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"><PlusIcon /> New Google Doc</button>}
-            {isDriveConnected && activeTab === 'Local' && <button onClick={triggerFileUpload} className="flex items-center bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg"><PlusIcon /> Upload Local File</button>}
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+        <h3 className="text-lg font-semibold text-brevo-text-primary">Local</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+            {!isDriveConnected && <button onClick={() => setIsDriveConnected(true)} className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm"><GoogleDriveIcon /> Connect Google Drive</button>}
+            <button onClick={triggerFileUpload} className="flex items-center bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg text-sm"><PlusIcon /> Upload Local File</button>
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
         </div>
       </div>
-
-      {activeTab === 'Local' && (
-        <div>
+      
+      {/* Local Documents Section */}
+      <div className="mb-8">
             <div className="border-b border-brevo-border mb-4">
                 <nav className="-mb-px flex space-x-4 overflow-x-auto">
                     {localTabs.map(tab => (<button key={tab} onClick={() => setActiveLocalTab(tab)} className={`${activeLocalTab === tab ? 'border-brevo-cta text-brevo-cta' : 'border-transparent text-brevo-text-secondary hover:text-brevo-text-primary'} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}>{tab}</button>))}
                 </nav>
             </div>
-            <AiDocGenerator category={activeLocalTab} owner={owner} ownerType={ownerType} kanbanApi={kanbanApi} />
-            <h4 className="text-base font-semibold text-brevo-text-primary mt-8 mb-4">Uploaded Documents</h4>
+            <AiDocGenerator category={activeLocalTab} owner={owner} ownerType={ownerType} kanbanApi={kanbanApi} isDriveConnected={isDriveConnected} />
+            <h5 className="text-base font-semibold text-brevo-text-primary mt-8 mb-4">Uploaded "{activeLocalTab}"</h5>
             {filteredDocuments.length > 0 ? (
             <ul className="space-y-3">
                 {filteredDocuments.map(doc => (
@@ -73,20 +70,23 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, owner, own
                 </li>))}
             </ul>) : (<div className="text-center py-10 text-brevo-text-secondary bg-gray-50 rounded-lg border border-dashed border-gray-300"><p>No documents in "{activeLocalTab}" yet.</p></div>)}
         </div>
-      )}
       
-       {activeTab === 'Google Drive' && (
-        <div>
-             <h4 className="text-base font-semibold text-brevo-text-primary mb-4">Google Drive Documents</h4>
+      {/* Google Drive Section */}
+      {isDriveConnected && (
+       <div className="mt-8 pt-6 border-t border-brevo-border">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+              <h4 className="text-base font-semibold text-brevo-text-primary">Google Drive Documents</h4>
+              <button onClick={() => onAddDocument({name: 'New Google Doc', content:''}, 'Templates', owner.id, ownerType)} className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm"><PlusIcon /> New Google Doc</button>
+            </div>
             {googleDocs.length > 0 ? (
             <ul className="space-y-3">
                 {googleDocs.map(doc => (
                 <li key={doc.id} className="bg-white p-3 rounded-md flex items-center justify-between border border-brevo-border">
-                    <div className="flex items-center"><GoogleDriveIcon /><div className="ml-3"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">{doc.name}</a><p className="text-xs text-brevo-text-secondary">Created on {new Date(doc.createdAt).toLocaleDateString()}</p></div></div>
+                    <div className="flex items-center"><GoogleDriveIcon /><div className="ml-3"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">{doc.name}</a><p className="text-xs text-brevo-text-secondary">Created on {new Date(doc.createdAt).toLocaleDateString()}</p>{doc.note && <p className="text-xs text-brevo-text-secondary italic mt-1">Note: "{doc.note}"</p>}</div></div>
                     <div className="flex items-center space-x-3"><button onClick={() => onDeleteDocument(doc.id)} className="text-brevo-text-secondary hover:text-red-500"><TrashIcon /></button></div>
                 </li>))}
             </ul>) : (<div className="text-center py-10 text-brevo-text-secondary bg-gray-50 rounded-lg border border-dashed border-gray-300"><p>No Google Docs created yet.</p></div>)}
-        </div>
+       </div>
        )}
     </div>
   );

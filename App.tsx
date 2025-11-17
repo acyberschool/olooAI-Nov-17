@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import VoiceControl from './components/VoiceControl';
 import ChatInterface from './components/ChatInterface';
@@ -18,6 +19,7 @@ import { Task } from './types';
 import TeamView from './components/TeamView';
 import UniversalInputModal from './components/UniversalInputModal';
 import DataInsightsView from './components/DataInsightsView';
+import SettingsView from './components/SettingsView';
 
 
 // --- Google Analytics Helper ---
@@ -36,7 +38,7 @@ export const trackEvent = (action: string, category: string, label: string, valu
     }
 }
 
-export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'crm' | 'team' | 'data';
+export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'crm' | 'team' | 'data' | 'settings';
 export type UniversalInputContext = {
     clientId?: string;
     dealId?: string;
@@ -212,6 +214,8 @@ export default function App() {
     }
     
     switch (activeView) {
+      case 'settings':
+        return <SettingsView />;
       case 'data':
         return <DataInsightsView kanbanApi={kanban} />;
       case 'team':
@@ -261,6 +265,7 @@ export default function App() {
             onSelectDeal={handleSelectDeal}
             onSelectTask={handleSelectTask}
             onOpenUniversalInput={handleOpenUniversalInput}
+            kanbanApi={kanban}
           />;
     }
   };
@@ -278,16 +283,18 @@ export default function App() {
             <h1 className="text-2xl font-bold text-brevo-cta">
               olooAI
             </h1>
-             <VoiceControl
-                isConnecting={assistant.isConnecting}
-                isRecording={assistant.isRecording}
-                startRecording={handleStartRecording}
-                stopRecording={assistant.stopRecording}
-              />
           </div>
-           <p className="text-sm text-brevo-text-secondary hidden md:block">
-              Your AI Business Assistant, Walter.
-            </p>
+           <div className="flex items-center gap-4">
+                <p className="text-sm text-brevo-text-secondary hidden md:block">
+                Your AI Business Assistant, Walter.
+                </p>
+                <VoiceControl
+                    isConnecting={assistant.isConnecting}
+                    isRecording={assistant.isRecording}
+                    startRecording={handleStartRecording}
+                    stopRecording={assistant.stopRecording}
+                />
+            </div>
         </header>
         
         <main className="flex-1 p-4 lg:p-6 overflow-auto">

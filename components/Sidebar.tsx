@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { View } from '../App';
 
@@ -39,6 +40,7 @@ const DealsIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...pro
 const CRMIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" /></svg>;
 const TeamIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.512 2.72a3 3 0 01-4.682-2.72 9.094 9.094 0 013.741-.479m7.512 2.72a8.97 8.97 0 01-3.741-.479m3.741.479a8.97 8.97 0 00-3.741-.479m-7.512 2.72a9.094 9.094 0 01-3.741-.479m5.408 1.903a9.094 9.094 0 01-3.741-.479M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>;
 const ChartBarIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>;
+const SettingsIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-1.007 1.11-1.226.55-.22 1.156-.22 1.706 0 .55.219 1.02.684 1.11 1.226l.043.25a1.58 1.58 0 001.086 1.086l.25.043c.542.09 1.007.56 1.226 1.11.22.55.22 1.156 0 1.706-.219.55-.684 1.02-1.226 1.11l-.25.043a1.58 1.58 0 00-1.086 1.086l-.043.25c-.09.542-.56 1.007-1.11 1.226-.55.22-1.156.22-1.706 0-.55-.219-1.02-.684-1.11-1.226l-.043-.25a1.58 1.58 0 00-1.086-1.086l-.25-.043c-.542-.09-1.007-.56-1.226-1.11-.22-.55-.22-1.156 0-1.706.219-.55.684-1.02 1.226-1.11l.25-.043a1.58 1.58 0 001.086-1.086l.043-.25z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.875a5.125 5.125 0 100 10.25 5.125 5.125 0 000-10.25z" /></svg>;
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, setIsOpen }) => {
   return (
@@ -65,6 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             <ul className="space-y-1 pt-4 border-t border-brevo-border">
                 <NavItem label="Team & Access" view="team" activeView={activeView} onClick={setActiveView} icon={<TeamIcon />} />
                 <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={setActiveView} icon={<ChartBarIcon />} />
+                <NavItem label="Settings" view="settings" activeView={activeView} onClick={setActiveView} icon={<SettingsIcon />} />
             </ul>
             <div className="mt-8 text-center text-brevo-text-secondary text-xs">
                 <p>Powered by Gemini</p>

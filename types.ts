@@ -183,8 +183,49 @@ export interface RouterBrainResult {
   tasks: RouterTask[];
   note: RouterNote | null;
   summary: string | null;
-  ui_message: string | null;
   businessLine?: Omit<BusinessLine, 'id'>;
   client?: Omit<Client, 'id' | 'businessLineId'> & { businessLineName?: string };
   deal?: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string };
+}
+
+
+// --- Local Gemini Types to avoid import issues ---
+
+export enum GeminiType {
+  STRING = 'STRING',
+  NUMBER = 'NUMBER',
+  INTEGER = 'INTEGER',
+  BOOLEAN = 'BOOLEAN',
+  ARRAY = 'ARRAY',
+  OBJECT = 'OBJECT',
+}
+
+export interface GeminiSchema {
+    type: GeminiType;
+    description?: string;
+    format?: string;
+    nullable?: boolean;
+    enum?: string[];
+    items?: GeminiSchema;
+    properties?: { [key: string]: GeminiSchema };
+    required?: string[];
+    propertyOrdering?: string[];
+}
+
+export interface GeminiFunctionDeclaration {
+  name: string;
+  description?: string;
+  parameters?: GeminiSchema;
+}
+
+export interface GeminiBlob {
+  data: string; // base64 encoded string
+  mimeType: string;
+}
+
+export enum GeminiModality {
+    MODALITY_UNSPECIFIED = 'MODALITY_UNSPECIFIED',
+    TEXT = 'TEXT',
+    IMAGE = 'IMAGE',
+    AUDIO = 'AUDIO',
 }

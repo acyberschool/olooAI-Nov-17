@@ -1,10 +1,8 @@
 
+
 import { useState, useRef, useCallback } from 'react';
-// FIX: LiveSession is not exported from @google/genai. It will be derived from connectToLiveSession.
-import { LiveServerMessage } from '@google/genai';
 import { connectToLiveSession, createPcmBlob } from '../services/geminiService';
 
-// FIX: Define LiveSession type based on the return type of connectToLiveSession.
 type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
 export const useDictation = () => {
@@ -35,9 +33,9 @@ export const useDictation = () => {
     }
   }, []);
 
-  const handleMessage = async (message: LiveServerMessage) => {
+  const handleMessage = async (message: any) => {
     if (message.serverContent?.inputTranscription) {
-        accumulatedTranscriptRef.current += message.serverContent.inputTranscription.text;
+        accumulatedTranscriptRef.current += (message.serverContent.inputTranscription.text || '');
     }
     if (message.serverContent?.turnComplete) {
         setTranscript(accumulatedTranscriptRef.current);

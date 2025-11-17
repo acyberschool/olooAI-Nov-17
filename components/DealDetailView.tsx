@@ -178,12 +178,14 @@ const DocumentsTab: React.FC<DealDetailViewProps> = ({ deal, documents, kanbanAp
 
 const AiIdeasTab: React.FC<DealDetailViewProps> = ({ deal, client, businessLine, kanbanApi }) => {
     const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+    const [opportunitySources, setOpportunitySources] = useState<any[]>([]);
     const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
 
     const handleGetOpportunities = async (expand = false) => {
         setIsLoadingOpportunities(true);
-        const result = await kanbanApi.getDealOpportunities(deal, expand);
+        const { opportunities: result, sources } = await kanbanApi.getDealOpportunities(deal, expand);
         setOpportunities(result);
+        setOpportunitySources(sources);
         setIsLoadingOpportunities(false);
     };
 
@@ -225,6 +227,20 @@ const AiIdeasTab: React.FC<DealDetailViewProps> = ({ deal, client, businessLine,
                             </li>
                         ))}
                         </ul>
+                         {opportunitySources.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                                <h5 className="text-xs font-semibold uppercase text-brevo-text-secondary tracking-wider">Sources from Walter's Research</h5>
+                                <ul className="list-disc list-inside text-xs mt-2 space-y-1">
+                                    {opportunitySources.map((source: any, index: number) => (
+                                        <li key={source.uri || index} className="text-blue-600 truncate">
+                                            <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline" title={source.uri}>
+                                                {source.title || source.uri}
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

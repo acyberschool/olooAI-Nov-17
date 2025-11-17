@@ -13,13 +13,15 @@ const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="
 
 const ProspectsView: React.FC<ProspectsViewProps> = ({ businessLine, kanbanApi }) => {
     const [prospects, setProspects] = useState<Prospect[]>([]);
+    const [sources, setSources] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
 
     const handleFindProspects = async (prompt: string) => {
         setIsLoading(true);
-        const results = await kanbanApi.findProspects(businessLine, prompt);
+        const { prospects: results, sources: newSources } = await kanbanApi.findProspects(businessLine, prompt);
         setProspects(results);
+        setSources(newSources);
         setIsLoading(false);
     };
 
@@ -93,6 +95,20 @@ const ProspectsView: React.FC<ProspectsViewProps> = ({ businessLine, kanbanApi }
             {prospects.length === 0 && !isLoading && (
                  <div className="text-center py-10 text-[#6B7280] bg-gray-50 rounded-lg border-dashed border-2 border-gray-200">
                     <p>No prospects found yet. Click "Find Prospects" to start.</p>
+                </div>
+            )}
+            {sources.length > 0 && (
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-semibold text-brevo-text-primary mb-2">Sources from Walter's Research</h4>
+                    <ul className="list-disc list-inside text-xs space-y-1">
+                        {sources.map((source: any, index: number) => (
+                            <li key={source.uri || index} className="text-blue-600 truncate">
+                                <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline" title={source.uri}>
+                                    {source.title || source.uri}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
 
