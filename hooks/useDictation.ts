@@ -1,6 +1,11 @@
+
 import { useState, useRef, useCallback } from 'react';
-import { LiveSession, LiveServerMessage } from '@google/genai';
+// FIX: LiveSession is not exported from @google/genai. It will be derived from connectToLiveSession.
+import { LiveServerMessage } from '@google/genai';
 import { connectToLiveSession, createPcmBlob } from '../services/geminiService';
+
+// FIX: Define LiveSession type based on the return type of connectToLiveSession.
+type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
 export const useDictation = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -74,7 +79,7 @@ export const useDictation = () => {
             onClose: () => {
                 setIsRecording(false);
             },
-        });
+        }, 'Transcribe the user\'s speech accurately.', false);
     } catch (err) {
         console.error("Failed to start dictation:", err);
         cleanup();

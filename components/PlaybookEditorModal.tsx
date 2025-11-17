@@ -58,16 +58,16 @@ const PlaybookEditorModal: React.FC<PlaybookEditorModalProps> = ({ isOpen, onClo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-2xl border border-gray-700 flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold mb-6 text-white">Edit Playbook for "{playbook.businessLineId}"</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl border border-[#E5E7EB] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-semibold mb-6 text-[#111827]">Edit Playbook for "{playbook.businessLineId}"</h2>
         <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-hidden flex flex-col">
             <div className="flex-1 overflow-y-auto pr-4 space-y-4">
                 {steps.map((step, index) => (
-                    <div key={step.id || index} className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 flex space-x-4">
+                    <div key={step.id || index} className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex space-x-4">
                         <div className="flex flex-col space-y-2">
-                            <button type="button" onClick={() => moveStep(index, 'up')} disabled={index === 0} className="text-gray-400 hover:text-white disabled:opacity-30"><UpArrowIcon/></button>
-                            <button type="button" onClick={() => moveStep(index, 'down')} disabled={index === steps.length - 1} className="text-gray-400 hover:text-white disabled:opacity-30"><DownArrowIcon/></button>
+                            <button type="button" onClick={() => moveStep(index, 'up')} disabled={index === 0} className="text-[#6B7280] hover:text-[#111827] disabled:opacity-30"><UpArrowIcon/></button>
+                            <button type="button" onClick={() => moveStep(index, 'down')} disabled={index === steps.length - 1} className="text-[#6B7280] hover:text-[#111827] disabled:opacity-30"><DownArrowIcon/></button>
                         </div>
                         <div className="flex-1 space-y-2">
                             <input
@@ -75,7 +75,7 @@ const PlaybookEditorModal: React.FC<PlaybookEditorModalProps> = ({ isOpen, onClo
                                 value={step.title}
                                 onChange={(e) => handleStepChange(index, 'title', e.target.value)}
                                 placeholder="Step Title"
-                                className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500"
+                                className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
                                 required
                             />
                             <textarea
@@ -83,24 +83,24 @@ const PlaybookEditorModal: React.FC<PlaybookEditorModalProps> = ({ isOpen, onClo
                                 onChange={(e) => handleStepChange(index, 'description', e.target.value)}
                                 placeholder="Step Description"
                                 rows={2}
-                                className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500"
+                                className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
                                 required
                             />
                         </div>
-                        <button type="button" onClick={() => removeStep(index)} className="text-gray-500 hover:text-red-500"><TrashIcon /></button>
+                        <button type="button" onClick={() => removeStep(index)} className="text-[#6B7280] hover:text-red-500"><TrashIcon /></button>
                     </div>
                 ))}
             </div>
 
             <div className="pt-4">
-                 <button type="button" onClick={addStep} className="flex items-center text-sm text-indigo-400 hover:text-indigo-300">
+                 <button type="button" onClick={addStep} className="flex items-center text-sm text-[#15803D] hover:text-[#166534]">
                     <PlusIcon /> Add Step
                 </button>
             </div>
           
           <div className="flex justify-end space-x-4 pt-6">
-            <button type="button" onClick={onClose} className="py-2 px-4 rounded-md text-gray-300 hover:bg-gray-700">Cancel</button>
-            <button type="submit" className="py-2 px-4 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Save Playbook</button>
+            <button type="button" onClick={onClose} className="py-2 px-4 rounded-md text-[#111827] hover:bg-gray-100">Cancel</button>
+            <button type="submit" className="py-2 px-4 rounded-md bg-[#15803D] hover:bg-[#166534] text-white font-semibold">Save Playbook</button>
           </div>
         </form>
       </div>

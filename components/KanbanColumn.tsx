@@ -17,19 +17,19 @@ interface KanbanColumnProps {
 
 const statusConfig = {
     [KanbanStatus.ToDo]: {
-      color: "bg-blue-900/50 border-blue-500",
-      title: "Work to do",
+      color: "border-gray-400",
+      title: "To Do",
     },
     [KanbanStatus.Doing]: {
-      color: "bg-purple-900/50 border-purple-500",
-      title: "Things you are doing",
+      color: "border-blue-500",
+      title: "Doing",
     },
     [KanbanStatus.Done]: {
-      color: "bg-green-900/50 border-green-500",
-      title: "Things you've done",
+      color: "border-green-500",
+      title: "Done",
     },
     [KanbanStatus.Terminated]: {
-      color: "bg-gray-800/50 border-gray-600",
+      color: "border-red-500",
       title: "Terminated",
     },
 };
@@ -78,15 +78,17 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDrop={handleDrop}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
-      className={`rounded-lg p-4 ${config.color} ${isDragOver ? 'border-dashed border-2 bg-indigo-900/40' : 'border-t-4'} transition-all duration-200`}
+      className={`rounded-lg p-4 bg-transparent ${isDragOver ? 'border-dashed border-2 border-green-600 bg-green-50/50' : `border-t-4 ${config.color}`} transition-all duration-200`}
     >
-      <h2 className="font-bold text-lg mb-4 flex items-center justify-between">
-        {config.title}
-        <span className="text-sm font-normal bg-gray-700 text-gray-300 rounded-full px-2 py-1">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-lg text-brevo-text-primary">
+          {config.title}
+        </h2>
+        <span className="text-sm font-medium bg-gray-200 text-brevo-text-secondary rounded-full px-2 py-0.5">
           {tasks.length}
         </span>
-      </h2>
-      <div className="space-y-4 h-[70vh] overflow-y-auto pr-2">
+      </div>
+      <div className="space-y-4 h-[70vh] overflow-y-auto pr-2 -mr-2">
         {tasks.map((task) => (
           <TaskCard 
             key={task.id} 
@@ -101,7 +103,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
           />
         ))}
         {tasks.length === 0 && (
-          <div className="text-center text-gray-500 pt-8">
+          <div className="text-center text-brevo-text-secondary pt-8">
             <p>Nothing here yet.</p>
           </div>
         )}

@@ -49,9 +49,9 @@ export const initialClients: Client[] = [
 ];
 
 export const initialDeals: Deal[] = [
-  { id: 'deal-1', name: 'Warehouse monthly fumigation', description: "Ongoing monthly fumigation for ABC's main warehouse.", status: 'Open', clientId: 'client-1', businessLineId: 'bl-1', playbookId: 'playbook-1' },
-  { id: 'deal-2', name: 'Q2 cleaning services', description: 'Quarterly deep cleaning for all common areas.', status: 'Closed', clientId: 'client-3', businessLineId: 'bl-3' },
-  { id: 'deal-3', name: 'Advanced React Training', description: 'A 5-day intensive training course for their senior developers.', status: 'Open', clientId: 'client-2', businessLineId: 'bl-2' },
+  { id: 'deal-1', name: 'Warehouse monthly fumigation', description: "Ongoing monthly fumigation for ABC's main warehouse.", status: 'Open', clientId: 'client-1', businessLineId: 'bl-1', playbookId: 'playbook-1', value: 5000, currency: 'USD', revenueModel: 'Full Pay', amountPaid: 1500 },
+  { id: 'deal-2', name: 'Q2 cleaning services', description: 'Quarterly deep cleaning for all common areas.', status: 'Closed - Won', clientId: 'client-3', businessLineId: 'bl-3', value: 2500, currency: 'KES', revenueModel: 'Full Pay', amountPaid: 2500 },
+  { id: 'deal-3', name: 'Advanced React Training', description: 'A 5-day intensive training course for their senior developers.', status: 'Open', clientId: 'client-2', businessLineId: 'bl-2', value: 10000, currency: 'USD', revenueModel: 'Full Pay', amountPaid: 0 },
 ];
 
 export const initialTasks: Task[] = [

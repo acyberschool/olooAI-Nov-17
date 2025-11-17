@@ -23,6 +23,7 @@ export interface Task {
   businessLineId?: string;
   type: TaskType;
   playbookStepId?: string;
+  subTasks?: { id: string; text: string; isDone: boolean }[];
 }
 
 export interface BusinessLine {
@@ -58,11 +59,15 @@ export interface Deal {
   id: string;
   name: string;
   description: string;
-  status: 'Open' | 'Closed';
+  status: 'Open' | 'Closed - Won' | 'Closed - Lost';
   clientId: string;
   businessLineId: string;
   playbookId?: string;
   suggestions?: Suggestion[];
+  value: number;
+  currency: 'USD' | 'EUR' | 'GBP' | 'KES';
+  revenueModel: 'Revenue Share' | 'Full Pay';
+  amountPaid: number;
 }
 
 export type DocumentCategory = 'SOPs' | 'Legal' | 'Templates' | 'Marketing' | 'Business Development' | 'Playbooks';
@@ -102,4 +107,84 @@ export interface Suggestion {
   id: string;
   text: string;
   taskData: Partial<Omit<Task, 'id' | 'status'>>;
+}
+
+export type RoleScope = 'All access' | 'Clients only' | 'Deals only' | 'Tasks only';
+export type RolePermission = 'Can edit' | 'Read-only';
+
+export interface Role {
+  scope: RoleScope;
+  permission: RolePermission;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: 'Active' | 'Invited';
+}
+
+export interface Prospect {
+    id: string;
+    name: string;
+    likelyNeed: string;
+}
+
+export interface ClientPulse {
+    id: string;
+    source: 'Social Media' | 'News';
+    content: string;
+    url: string;
+    date: string;
+}
+
+export interface CompetitorInsight {
+    id: string;
+    competitorName: string;
+    insight: string;
+    source: string;
+}
+
+export interface SearchTrend {
+    id: string;
+    keyword: string;
+    insight: string;
+}
+
+export interface PlatformInsight {
+    id: string;
+    text: string;
+}
+
+export interface FilterOptions {
+    location: string;
+    timeframe: string;
+    scope: string;
+    customQuery: string;
+}
+
+// --- AI Router Brain Types ---
+export interface RouterTask {
+  title: string;
+  due_date: string | null;
+  client_name: string | null;
+  deal_name: string | null;
+  update_hint: string | null;
+}
+
+export interface RouterNote {
+  text: string;
+  channel: CRMEntryType;
+}
+
+export interface RouterBrainResult {
+  action: 'create_task' | 'create_note' | 'both' | 'update_task' | 'ignore' | 'create_business_line' | 'create_client' | 'create_deal';
+  tasks: RouterTask[];
+  note: RouterNote | null;
+  summary: string | null;
+  ui_message: string | null;
+  businessLine?: Omit<BusinessLine, 'id'>;
+  client?: Omit<Client, 'id' | 'businessLineId'> & { businessLineName?: string };
+  deal?: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string };
 }

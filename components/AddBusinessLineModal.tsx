@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { BusinessLine } from '../types';
 
-interface AddBusinessLineModalProps {
+interface EditBusinessLineModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<BusinessLine, 'id'> | BusinessLine) => void;
-  businessLine: BusinessLine | null;
+  onSave: (data: BusinessLine) => void;
+  businessLine: BusinessLine;
 }
 
-const AddBusinessLineModal: React.FC<AddBusinessLineModalProps> = ({ isOpen, onClose, onSave, businessLine }) => {
+const AddBusinessLineModal: React.FC<EditBusinessLineModalProps> = ({ isOpen, onClose, onSave, businessLine }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -24,8 +24,6 @@ const AddBusinessLineModal: React.FC<AddBusinessLineModalProps> = ({ isOpen, onC
         customers: businessLine.customers,
         aiFocus: businessLine.aiFocus,
       });
-    } else {
-      setFormData({ name: '', description: '', customers: '', aiFocus: '' });
     }
   }, [businessLine, isOpen]);
 
@@ -36,22 +34,18 @@ const AddBusinessLineModal: React.FC<AddBusinessLineModalProps> = ({ isOpen, onC
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (businessLine) {
-      onSave({ ...businessLine, ...formData });
-    } else {
-      onSave(formData);
-    }
+    onSave({ ...businessLine, ...formData });
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-lg border border-gray-700" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold mb-6 text-white">{businessLine ? 'Edit' : 'Add'} Business Line</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-lg border border-[#E5E7EB]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-semibold mb-6 text-[#111827]">Edit Business Line</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">Business line name</label>
+            <label htmlFor="name" className="block text-sm font-medium text-[#111827] mb-1">Business line name</label>
             <input
               type="text"
               id="name"
@@ -59,12 +53,12 @@ const AddBusinessLineModal: React.FC<AddBusinessLineModalProps> = ({ isOpen, onC
               value={formData.name}
               onChange={handleChange}
               placeholder="e.g., Fumigation"
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D] focus:border-[#15803D]"
               required
             />
           </div>
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">What kind of work is this?</label>
+            <label htmlFor="description" className="block text-sm font-medium text-[#111827] mb-1">What kind of work is this?</label>
             <input
               type="text"
               id="description"
@@ -72,12 +66,12 @@ const AddBusinessLineModal: React.FC<AddBusinessLineModalProps> = ({ isOpen, onC
               value={formData.description}
               onChange={handleChange}
               placeholder="e.g., We help apartments get rid of pests."
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D] focus:border-[#15803D]"
               required
             />
           </div>
            <div>
-            <label htmlFor="customers" className="block text-sm font-medium text-gray-300 mb-1">Who are your typical customers?</label>
+            <label htmlFor="customers" className="block text-sm font-medium text-[#111827] mb-1">Who are your typical customers?</label>
             <input
               type="text"
               id="customers"
@@ -85,12 +79,12 @@ const AddBusinessLineModal: React.FC<AddBusinessLineModalProps> = ({ isOpen, onC
               value={formData.customers}
               onChange={handleChange}
               placeholder="e.g., Apartments, estates, and small offices."
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D] focus:border-[#15803D]"
               required
             />
           </div>
            <div>
-            <label htmlFor="aiFocus" className="block text-sm font-medium text-gray-300 mb-1">What should AI look for here?</label>
+            <label htmlFor="aiFocus" className="block text-sm font-medium text-[#111827] mb-1">What should AI look for here?</label>
             <input
               type="text"
               id="aiFocus"
@@ -98,13 +92,13 @@ const AddBusinessLineModal: React.FC<AddBusinessLineModalProps> = ({ isOpen, onC
               value={formData.aiFocus}
               onChange={handleChange}
               placeholder="e.g., Find estate-wide contracts and upsell annual plans."
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D] focus:border-[#15803D]"
               required
             />
           </div>
           <div className="flex justify-end space-x-4 pt-4">
-            <button type="button" onClick={onClose} className="py-2 px-4 rounded-md text-gray-300 hover:bg-gray-700">Cancel</button>
-            <button type="submit" className="py-2 px-4 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Save</button>
+            <button type="button" onClick={onClose} className="py-2 px-4 rounded-md text-[#111827] hover:bg-gray-100">Cancel</button>
+            <button type="submit" className="py-2 px-4 rounded-md bg-[#15803D] hover:bg-[#166534] text-white font-semibold">Save Changes</button>
           </div>
         </form>
       </div>

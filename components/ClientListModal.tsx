@@ -31,11 +31,11 @@ const ClientListModal: React.FC<ClientListModalProps> = ({ isOpen, onClose, clie
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-2xl border border-gray-700" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl border border-[#E5E7EB]" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">Clients</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            <h2 className="text-xl font-semibold text-[#111827]">Clients</h2>
+            <button onClick={onClose} className="text-[#6B7280] hover:text-[#111827] text-3xl leading-none">&times;</button>
         </div>
 
         <div className="mb-6">
@@ -45,10 +45,10 @@ const ClientListModal: React.FC<ClientListModalProps> = ({ isOpen, onClose, clie
                 value={newClientName}
                 onChange={(e) => setNewClientName(e.target.value)}
                 placeholder="Add new client name (quick add)..."
-                className="flex-grow bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="flex-grow bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D] focus:border-[#15803D]"
                 required
                 />
-                <button type="submit" className="py-2 px-4 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Add Client</button>
+                <button type="submit" className="py-2 px-4 rounded-md bg-[#15803D] hover:bg-[#166534] text-white font-semibold">Add Client</button>
             </form>
         </div>
 
@@ -56,14 +56,14 @@ const ClientListModal: React.FC<ClientListModalProps> = ({ isOpen, onClose, clie
           {clients.length > 0 ? (
             <ul className="space-y-3">
               {clients.map((client) => (
-                <li key={client.id} className="bg-gray-900/50 p-4 rounded-lg flex justify-between items-center border border-gray-700">
-                  <span className="font-medium text-gray-200">{client.name}</span>
-                  <button onClick={() => handleSelect(client.id)} className="text-xs text-indigo-400 hover:underline">View Details</button>
+                <li key={client.id} className="bg-gray-50 p-4 rounded-lg flex justify-between items-center border border-[#E5E7EB]">
+                  <span className="font-medium text-[#111827]">{client.name}</span>
+                  <button onClick={() => handleSelect(client.id)} className="text-sm text-[#15803D] hover:underline">View Details</button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-center text-gray-500 py-8">No clients found for this business line.</p>
+            <p className="text-center text-[#6B7280] py-8">No clients found for this business line.</p>
           )}
         </div>
       </div>

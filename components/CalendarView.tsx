@@ -59,15 +59,15 @@ const CalendarView: React.FC<CalendarViewProps> = (props) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 bg-gray-800/50 p-6 rounded-lg border border-gray-700">
+      <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-[#E5E7EB]">
         <div className="flex justify-between items-center mb-4">
-          <button onClick={() => changeMonth(-1)} className="p-2 rounded-full hover:bg-gray-700"><ChevronLeftIcon /></button>
-          <h3 className="text-xl font-bold text-white">
+          <button onClick={() => changeMonth(-1)} className="p-2 rounded-full hover:bg-gray-100"><ChevronLeftIcon /></button>
+          <h3 className="text-lg font-semibold text-[#111827]">
             {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
           </h3>
-          <button onClick={() => changeMonth(1)} className="p-2 rounded-full hover:bg-gray-700"><ChevronRightIcon /></button>
+          <button onClick={() => changeMonth(1)} className="p-2 rounded-full hover:bg-gray-100"><ChevronRightIcon /></button>
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-[#6B7280] mb-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day}>{day}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-1">
@@ -82,18 +82,18 @@ const CalendarView: React.FC<CalendarViewProps> = (props) => {
               <div
                 key={key}
                 onClick={() => handleDateClick(day)}
-                className={`h-20 p-2 rounded-lg flex flex-col justify-between transition-colors ${day ? 'cursor-pointer bg-gray-800 hover:bg-gray-700' : 'bg-transparent'} ${isSelected ? 'bg-indigo-600 !text-white' : ''} ${isToday ? 'border-2 border-teal-500' : 'border border-gray-700'}`}
+                className={`h-20 p-2 rounded-lg flex flex-col justify-between transition-colors ${day ? 'cursor-pointer bg-white hover:bg-gray-50' : 'bg-transparent'} ${isSelected ? 'bg-[#15803D] !text-white' : ''} ${isToday ? 'border-2 border-green-600' : 'border border-[#E5E7EB]'}`}
               >
-                <span className={`font-semibold ${isSelected ? 'text-white' : 'text-gray-300'}`}>{day}</span>
-                {hasTasks && <div className="w-2 h-2 bg-blue-400 rounded-full self-end"></div>}
+                <span className={`font-semibold ${isSelected ? 'text-white' : 'text-[#111827]'}`}>{day}</span>
+                {hasTasks && <div className={`w-2 h-2 rounded-full self-end ${isSelected ? 'bg-white' : 'bg-[#15803D]'}`}></div>}
               </div>
             );
           })}
         </div>
       </div>
 
-      <div className="lg:col-span-1 bg-gray-800/50 p-6 rounded-lg border border-gray-700">
-          <h3 className="text-xl font-bold text-white mb-4">
+      <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-[#E5E7EB]">
+          <h3 className="text-lg font-semibold text-[#111827] mb-4">
               Tasks for {selectedDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
           </h3>
           <div className="space-y-4 h-[60vh] overflow-y-auto pr-2">
@@ -102,7 +102,7 @@ const CalendarView: React.FC<CalendarViewProps> = (props) => {
                     <TaskCard key={task.id} task={task} {...props} />
                 ))
             ) : (
-                <div className="text-center text-gray-500 pt-16">
+                <div className="text-center text-[#6B7280] pt-16">
                     <p>No tasks due on this day.</p>
                 </div>
             )}

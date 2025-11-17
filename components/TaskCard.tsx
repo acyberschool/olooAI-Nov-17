@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task, TaskType, BusinessLine, Client, Deal } from '../types';
+import { Task, TaskType, BusinessLine, Client, Deal, KanbanStatus } from '../types';
 
 const ClockIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -26,9 +26,19 @@ const MeetingIcon = () => (
 );
 
 const typeConfig = {
-    [TaskType.Task]: { icon: <TaskIconType />, color: "text-blue-400" },
-    [TaskType.Reminder]: { icon: <ReminderIcon />, color: "text-yellow-400" },
-    [TaskType.Meeting]: { icon: <MeetingIcon />, color: "text-green-400" },
+    [TaskType.Task]: { icon: <TaskIconType />, color: "text-blue-600" },
+    [TaskType.Reminder]: { icon: <ReminderIcon />, color: "text-yellow-600" },
+    [TaskType.Meeting]: { icon: <MeetingIcon />, color: "text-green-600" },
+};
+
+const statusChip = (status: KanbanStatus) => {
+    switch (status) {
+      case KanbanStatus.ToDo: return 'bg-gray-200 text-gray-800';
+      case KanbanStatus.Doing: return 'bg-blue-100 text-blue-800';
+      case KanbanStatus.Done: return 'bg-green-100 text-green-800';
+      case KanbanStatus.Terminated: return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-200 text-gray-800';
+    }
 };
 
 interface TaskCardProps {
@@ -67,41 +77,49 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, businessLine, client, deal, o
         action();
     }
     
+    const isPersonal = !task.businessLineId && !task.clientId && !task.dealId;
+
     return (
         <div 
             draggable
             onDragStart={handleDragStart}
             onClick={() => onSelectTask(task)}
-            className="bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700 hover:border-indigo-500 transition-all duration-200 cursor-pointer active:cursor-grabbing"
+            className="bg-white rounded-lg p-4 shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border hover:shadow-lg transition-all duration-200 cursor-pointer active:cursor-grabbing"
         >
             <div className="flex items-start">
                 <span className={`mt-0.5 ${config.color}`}>{config.icon}</span>
                 <div className="flex-1">
-                    <h3 className="font-bold text-gray-100">{task.title}</h3>
+                    <h3 className="font-semibold text-brevo-text-primary text-base">{task.title}</h3>
                     {task.description && (
-                        <p className="text-sm text-gray-400 mt-1">{task.description}</p>
+                        <p className="text-sm text-brevo-text-secondary mt-1">{task.description}</p>
                     )}
                 </div>
             </div>
             
-            <div className="mt-4 pl-7 text-xs text-gray-400 flex flex-wrap gap-2">
+            <div className="mt-4 pl-7 text-xs flex flex-wrap gap-2 items-center">
+                <span className={`font-semibold rounded-full px-2 py-1 ${statusChip(task.status)}`}>{task.status}</span>
+                {isPersonal && (
+                    <span className="bg-purple-100 text-purple-800 rounded-full px-2 py-1">
+                        Personal
+                    </span>
+                )}
                 {businessLine && (
-                    <span onClick={(e) => handleLinkClick(e, () => onSelectBusinessLine(businessLine.id))} className="bg-gray-700/60 text-indigo-300 rounded-full px-2 py-1 cursor-pointer hover:bg-gray-700">
-                        BL: {businessLine.name}
+                    <span onClick={(e) => handleLinkClick(e, () => onSelectBusinessLine(businessLine.id))} className="bg-gray-100 text-gray-600 rounded-full px-2 py-1 cursor-pointer hover:bg-gray-200">
+                        {businessLine.name}
                     </span>
                 )}
                 {client && (
-                    <span onClick={(e) => handleLinkClick(e, () => onSelectClient(client.id))} className="bg-gray-700/60 text-purple-300 rounded-full px-2 py-1 cursor-pointer hover:bg-gray-700">
-                        Client: {client.name}
+                    <span onClick={(e) => handleLinkClick(e, () => onSelectClient(client.id))} className="bg-blue-100 text-blue-800 rounded-full px-2 py-1 cursor-pointer hover:bg-blue-200">
+                        {client.name}
                     </span>
                 )}
                  {deal && (
-                    <span onClick={(e) => handleLinkClick(e, () => onSelectDeal(deal.id))} className="bg-gray-700/60 text-teal-300 rounded-full px-2 py-1 cursor-pointer hover:bg-gray-700">
-                        Deal: {deal.name}
+                    <span onClick={(e) => handleLinkClick(e, () => onSelectDeal(deal.id))} className="bg-green-100 text-green-800 rounded-full px-2 py-1 cursor-pointer hover:bg-green-200">
+                        {deal.name}
                     </span>
                 )}
                 {task.dueDate && (
-                     <div className={`flex items-center rounded-full px-2 py-1 ${isOverdue ? 'bg-red-900/70 text-red-300' : 'bg-gray-700/60'}`}>
+                     <div className={`flex items-center rounded-full px-2 py-1 text-xs ${isOverdue ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-brevo-text-secondary'}`}>
                         <ClockIcon /> {formatDate(task.dueDate)}
                     </div>
                 )}

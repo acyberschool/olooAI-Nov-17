@@ -2,39 +2,37 @@ import React, { useState, useRef } from 'react';
 import { Document, DocumentCategory, DocumentOwnerType, BusinessLine, Client, Deal } from '../types';
 import AiDocGenerator from './AiDocGenerator';
 import { useKanban } from '../hooks/useKanban';
+// FIX: Import the 'Tabs' component.
+import Tabs from './Tabs';
 
 interface DocumentManagerProps {
   documents: Document[];
   owner: BusinessLine | Client | Deal;
   ownerType: DocumentOwnerType;
   kanbanApi: ReturnType<typeof useKanban>;
-  onAddDocument: (file: File, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => void;
+  onAddDocument: (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => void;
   onDeleteDocument: (docId: string) => void;
 }
 
-const PlusIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-);
-const DocumentIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-);
-const TrashIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-);
-const DownloadIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-);
+const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>);
+const DocumentIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-brevo-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>);
+const TrashIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>);
+const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>);
+const GoogleDriveIcon = () => (<svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.7121 21.4398L15.4242 9.01469L22.9999 13.2503L15.2878 21.4398H7.7121Z" fill="#34A853"/><path d="M4.00006 7.06018L11.7122 7.06018L15.4243 1L1 13.2503L4.00006 7.06018Z" fill="#FFC107"/><path d="M15.4243 9.0149L23 13.2505L19.2879 19.4398L11.7122 7.06041L15.4243 9.0149Z" fill="#EA4335"/><path d="M22.9999 13.2503L15.4242 1L8.80304 13.2503L15.2878 21.4398L22.9999 13.2503Z" fill="#4285F4"/></svg>)
+
 
 const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, owner, ownerType, kanbanApi, onAddDocument, onDeleteDocument }) => {
-  const [activeTab, setActiveTab] = useState<DocumentCategory>('SOPs');
+  const [activeTab, setActiveTab] = useState<string>('Local');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDriveConnected, setIsDriveConnected] = useState(false);
 
-  const tabs: DocumentCategory[] = ['SOPs', 'Legal', 'Templates', 'Marketing', 'Business Development'];
-  
+  const localTabs: DocumentCategory[] = ['SOPs', 'Legal', 'Templates', 'Marketing', 'Business Development'];
+  const [activeLocalTab, setActiveLocalTab] = useState<DocumentCategory>('SOPs');
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      onAddDocument(file, activeTab, owner.id, ownerType);
+      onAddDocument(file, activeLocalTab, owner.id, ownerType);
     }
   };
 
@@ -42,73 +40,54 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, owner, own
     fileInputRef.current?.click();
   };
 
-  const filteredDocuments = documents.filter(doc => doc.category === activeTab);
+  const filteredDocuments = documents.filter(doc => doc.category === activeLocalTab && !doc.url.startsWith('https://docs.google.com'));
+  const googleDocs = documents.filter(doc => doc.url.startsWith('https://docs.google.com'));
 
   return (
-    <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700">
+    <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
       <div className="flex justify-between items-center mb-4">
-          <div className="border-b border-gray-700">
-            <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-              {tabs.map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`${
-                    activeTab === tab
-                      ? 'border-indigo-500 text-indigo-400'
-                      : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-                  } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </nav>
-          </div>
+          <Tabs tabs={isDriveConnected ? ['Local', 'Google Drive'] : ['Local']} activeTab={activeTab} setActiveTab={setActiveTab} />
         <div>
+            {!isDriveConnected && <button onClick={() => setIsDriveConnected(true)} className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"><GoogleDriveIcon /> Connect Google Drive</button>}
+            {isDriveConnected && activeTab === 'Google Drive' && <button onClick={() => onAddDocument({name: 'New Google Doc', content:''}, 'Templates', owner.id, ownerType)} className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"><PlusIcon /> New Google Doc</button>}
+            {isDriveConnected && activeTab === 'Local' && <button onClick={triggerFileUpload} className="flex items-center bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg"><PlusIcon /> Upload Local File</button>}
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-            <button onClick={triggerFileUpload} className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                <PlusIcon /> Upload Document
-            </button>
         </div>
       </div>
 
-      <div>
-        <AiDocGenerator 
-            category={activeTab}
-            owner={owner}
-            ownerType={ownerType}
-            kanbanApi={kanbanApi}
-        />
-        <h4 className="text-lg font-semibold text-gray-300 mt-8 mb-4">Uploaded Documents</h4>
-        {filteredDocuments.length > 0 ? (
-          <ul className="space-y-3">
-            {filteredDocuments.map(doc => (
-              <li key={doc.id} className="bg-gray-800 p-3 rounded-md flex items-center justify-between border border-gray-700">
-                <div className="flex items-center">
-                    <DocumentIcon />
-                    <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-200">{doc.name}</p>
-                        <p className="text-xs text-gray-500">Uploaded on {new Date(doc.createdAt).toLocaleDateString()}</p>
-                        {doc.note && <p className="text-xs text-gray-400 italic mt-1">Note: "{doc.note}"</p>}
-                    </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                    <a href={doc.url} download={doc.name} className="text-gray-400 hover:text-white transition-colors">
-                        <DownloadIcon />
-                    </a>
-                    <button onClick={() => onDeleteDocument(doc.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                        <TrashIcon />
-                    </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-center py-10 text-gray-500">
-            <p>No documents in "{activeTab}" yet.</p>
-          </div>
-        )}
-      </div>
+      {activeTab === 'Local' && (
+        <div>
+            <div className="border-b border-brevo-border mb-4">
+                <nav className="-mb-px flex space-x-4 overflow-x-auto">
+                    {localTabs.map(tab => (<button key={tab} onClick={() => setActiveLocalTab(tab)} className={`${activeLocalTab === tab ? 'border-brevo-cta text-brevo-cta' : 'border-transparent text-brevo-text-secondary hover:text-brevo-text-primary'} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}>{tab}</button>))}
+                </nav>
+            </div>
+            <AiDocGenerator category={activeLocalTab} owner={owner} ownerType={ownerType} kanbanApi={kanbanApi} />
+            <h4 className="text-base font-semibold text-brevo-text-primary mt-8 mb-4">Uploaded Documents</h4>
+            {filteredDocuments.length > 0 ? (
+            <ul className="space-y-3">
+                {filteredDocuments.map(doc => (
+                <li key={doc.id} className="bg-white p-3 rounded-md flex items-center justify-between border border-brevo-border">
+                    <div className="flex items-center"><DocumentIcon /><div className="ml-3"><p className="text-sm font-medium text-brevo-text-primary">{doc.name}</p><p className="text-xs text-brevo-text-secondary">Uploaded on {new Date(doc.createdAt).toLocaleDateString()}</p>{doc.note && <p className="text-xs text-brevo-text-secondary italic mt-1">Note: "{doc.note}"</p>}</div></div>
+                    <div className="flex items-center space-x-3"><a href={doc.url} download={doc.name} className="text-brevo-text-secondary hover:text-brevo-text-primary"><DownloadIcon /></a><button onClick={() => onDeleteDocument(doc.id)} className="text-brevo-text-secondary hover:text-red-500"><TrashIcon /></button></div>
+                </li>))}
+            </ul>) : (<div className="text-center py-10 text-brevo-text-secondary bg-gray-50 rounded-lg border border-dashed border-gray-300"><p>No documents in "{activeLocalTab}" yet.</p></div>)}
+        </div>
+      )}
+      
+       {activeTab === 'Google Drive' && (
+        <div>
+             <h4 className="text-base font-semibold text-brevo-text-primary mb-4">Google Drive Documents</h4>
+            {googleDocs.length > 0 ? (
+            <ul className="space-y-3">
+                {googleDocs.map(doc => (
+                <li key={doc.id} className="bg-white p-3 rounded-md flex items-center justify-between border border-brevo-border">
+                    <div className="flex items-center"><GoogleDriveIcon /><div className="ml-3"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">{doc.name}</a><p className="text-xs text-brevo-text-secondary">Created on {new Date(doc.createdAt).toLocaleDateString()}</p></div></div>
+                    <div className="flex items-center space-x-3"><button onClick={() => onDeleteDocument(doc.id)} className="text-brevo-text-secondary hover:text-red-500"><TrashIcon /></button></div>
+                </li>))}
+            </ul>) : (<div className="text-center py-10 text-brevo-text-secondary bg-gray-50 rounded-lg border border-dashed border-gray-300"><p>No Google Docs created yet.</p></div>)}
+        </div>
+       )}
     </div>
   );
 };

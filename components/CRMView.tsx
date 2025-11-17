@@ -53,51 +53,53 @@ const CRMView: React.FC<CRMViewProps> = ({ clients, crmEntries, tasks, businessL
     }
 
   return (
-    <div className="p-4">
+    <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-indigo-400">Conversations & Follow-ups</h2>
+        <h2 className="text-2xl font-semibold text-[#15803D]">Conversations & Follow-ups</h2>
       </div>
 
-      <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
-        <table className="w-full text-left">
-            <thead className="border-b border-gray-700">
-                <tr>
-                    <th className="p-4">Client</th>
-                    <th className="p-4">Last Conversation</th>
-                    <th className="p-4">Next Planned Step</th>
-                </tr>
-            </thead>
-            <tbody>
-                {clientData.map(client => (
-                    <tr key={client.id} onClick={() => onSelectClient(client.id)} className="border-b border-gray-700 hover:bg-gray-800/50 cursor-pointer">
-                        <td className="p-4">
-                            <p className="font-bold text-white">{client.name}</p>
-                            <p className="text-xs text-indigo-300">{client.businessLineName}</p>
-                        </td>
-                        <td className="p-4">
-                            {client.lastEntry ? (
-                                <>
-                                    <p className="text-sm text-gray-300">{client.lastEntry.summary}</p>
-                                    <p className="text-xs text-gray-500">{timeAgo(new Date(client.lastEntry.createdAt))}</p>
-                                </>
-                            ) : (
-                                <p className="text-sm text-gray-500">No conversations logged</p>
-                            )}
-                        </td>
-                        <td className="p-4">
-                            {client.nextTask ? (
-                                <>
-                                    <p className="text-sm text-gray-300">{client.nextTask.title}</p>
-                                    <p className="text-xs text-red-400">Due: {new Date(client.nextTask.dueDate!).toLocaleDateString()}</p>
-                                </>
-                            ) : (
-                                <p className="text-sm text-gray-500">No next step planned</p>
-                            )}
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
-        </table>
+      <div className="bg-white rounded-xl shadow-lg border border-[#E5E7EB] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+              <thead className="border-b border-[#E5E7EB] bg-gray-50">
+                  <tr>
+                      <th className="p-4 text-sm font-medium text-[#6B7280]">Client</th>
+                      <th className="p-4 text-sm font-medium text-[#6B7280]">Last Conversation</th>
+                      <th className="p-4 text-sm font-medium text-[#6B7280]">Next Planned Step</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {clientData.map(client => (
+                      <tr key={client.id} onClick={() => onSelectClient(client.id)} className="border-b border-[#E5E7EB] last:border-b-0 hover:bg-gray-50 cursor-pointer">
+                          <td className="p-4">
+                              <p className="font-semibold text-[#111827]">{client.name}</p>
+                              <p className="text-xs text-[#14532D]">{client.businessLineName}</p>
+                          </td>
+                          <td className="p-4">
+                              {client.lastEntry ? (
+                                  <>
+                                      <p className="text-sm text-[#111827]">{client.lastEntry.summary}</p>
+                                      <p className="text-xs text-[#6B7280]">{timeAgo(new Date(client.lastEntry.createdAt))}</p>
+                                  </>
+                              ) : (
+                                  <p className="text-sm text-[#6B7280]">No conversations logged</p>
+                              )}
+                          </td>
+                          <td className="p-4">
+                              {client.nextTask ? (
+                                  <>
+                                      <p className="text-sm text-[#111827]">{client.nextTask.title}</p>
+                                      <p className="text-xs text-red-600">Due: {new Date(client.nextTask.dueDate!).toLocaleDateString()}</p>
+                                  </>
+                              ) : (
+                                  <p className="text-sm text-[#6B7280]">No next step planned</p>
+                              )}
+                          </td>
+                      </tr>
+                  ))}
+              </tbody>
+          </table>
+        </div>
       </div>
 
     </div>

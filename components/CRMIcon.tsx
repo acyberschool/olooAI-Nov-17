@@ -14,38 +14,38 @@ const AiActionIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h
 
 const CRMIcon: React.FC<CRMIconProps> = ({ type }) => {
   let icon = <NoteIcon />;
-  let color = 'text-gray-400';
+  let color = 'text-gray-500 bg-gray-100';
 
   switch (type) {
     case 'call':
       icon = <CallIcon />;
-      color = 'text-green-400';
+      color = 'text-green-700 bg-green-100';
       break;
     case 'email':
       icon = <EmailIcon />;
-      color = 'text-blue-400';
+      color = 'text-blue-700 bg-blue-100';
       break;
     case 'meeting':
       icon = <MeetingIcon />;
-      color = 'text-purple-400';
+      color = 'text-purple-700 bg-purple-100';
       break;
     case 'message':
         icon = <MessageIcon />;
-        color = 'text-yellow-400';
+        color = 'text-yellow-700 bg-yellow-100';
         break;
     case 'ai_action':
         icon = <AiActionIcon />;
-        color = 'text-teal-400';
+        color = 'text-teal-700 bg-teal-100';
         break;
     case 'note':
     default:
       icon = <NoteIcon />;
-      color = 'text-gray-400';
+      color = 'text-gray-700 bg-gray-100';
       break;
   }
 
   return (
-    <div className={`mr-4 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-gray-700/50 ${color}`}>
+    <div className={`mr-4 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${color}`}>
         {icon}
     </div>
   );

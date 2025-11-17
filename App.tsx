@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import VoiceControl from './components/VoiceControl';
 import ChatInterface from './components/ChatInterface';
 import { useKanban } from './hooks/useKanban';
@@ -14,17 +15,46 @@ import TasksView from './components/TasksView';
 import TaskDetailModal from './components/TaskDetailModal';
 import { useVoiceAssistant } from './hooks/useVoiceAssistant';
 import { Task } from './types';
+import TeamView from './components/TeamView';
+import UniversalInputModal from './components/UniversalInputModal';
+import DataInsightsView from './components/DataInsightsView';
 
-export type View = 'tasks' | 'businessLines' | 'clients' | 'deals' | 'crm';
 
-const ChatIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+// --- Google Analytics Helper ---
+declare global {
+    interface Window {
+        gtag: (...args: any[]) => void;
+    }
+}
+export const trackEvent = (action: string, category: string, label: string, value?: number) => {
+    if (window.gtag) {
+        window.gtag('event', action, {
+            'event_category': category,
+            'event_label': label,
+            'value': value,
+        });
+    }
+}
+
+export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'crm' | 'team' | 'data';
+export type UniversalInputContext = {
+    clientId?: string;
+    dealId?: string;
+    businessLineId?: string;
+    task?: Task;
+    placeholder?: string;
+};
+
+const MenuIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
     </svg>
 );
 
+
 export default function App() {
-  const [activeView, setActiveView] = useState<View>('tasks');
+  const [activeView, setActiveView] = useState<View>('homepage');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedBusinessLineId, setSelectedBusinessLineId] = useState<string | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
@@ -33,13 +63,20 @@ export default function App() {
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [lastInteraction, setLastInteraction] = useState({ user: '', assistant: '' });
 
+  const [isUniversalInputOpen, setIsUniversalInputOpen] = useState(false);
+  const [universalInputContext, setUniversalInputContext] = useState<UniversalInputContext>({});
+
   const handleTurnComplete = (user: string, assistant: string) => {
     if (user || assistant) {
       setLastInteraction({ user, assistant });
+      setIsChatVisible(true);
     }
   };
 
   const kanban = useKanban();
+
+  const platformActivitySummary = `Last 3 tasks: ${kanban.tasks.slice(0,3).map(t => t.title).join(', ')}. Last 3 CRM notes: ${kanban.crmEntries.slice(0,3).map(c => c.summary).join(', ')}.`;
+
   const assistant = useVoiceAssistant({
     onBoardItemCreate: kanban.addTask,
     onCrmEntryCreate: kanban.addCRMEntryFromVoice,
@@ -49,10 +86,20 @@ export default function App() {
     onDealCreate: kanban.addDeal,
     onDealStatusUpdate: (dealId, status) => kanban.updateDeal(dealId, { status }),
     onTurnComplete: handleTurnComplete,
+    onFindProspects: kanban.findProspectsByName,
     currentBusinessLineId: selectedBusinessLineId,
     currentClientId: selectedClientId,
     currentDealId: selectedDealId,
+    platformActivitySummary,
   });
+
+  useEffect(() => {
+    // Pre-load a business line for a better initial experience
+    if (kanban.businessLines.length > 0 && !selectedBusinessLineId) {
+      setSelectedBusinessLineId(kanban.businessLines[0].id);
+    }
+  }, [kanban.businessLines]);
+
 
   const clearSelections = () => {
     setSelectedBusinessLineId(null);
@@ -62,23 +109,28 @@ export default function App() {
   }
 
   const handleSetView = (view: View) => {
+    trackEvent('navigate', 'View', view);
     clearSelections();
     setActiveView(view);
+    setIsSidebarOpen(false); // Close sidebar on navigation change
   }
 
   const handleSelectBusinessLine = (id: string) => {
+    trackEvent('select', 'BusinessLine', id);
     clearSelections();
     setActiveView('businessLines');
     setSelectedBusinessLineId(id);
   };
 
   const handleSelectClient = (id: string) => {
+    trackEvent('select', 'Client', id);
     clearSelections();
     setActiveView('clients');
     setSelectedClientId(id);
   };
   
   const handleSelectDeal = (id: string) => {
+    trackEvent('select', 'Deal', id);
     clearSelections();
     setActiveView('deals');
     setSelectedDealId(id);
@@ -91,6 +143,11 @@ export default function App() {
   const handleStartRecording = () => {
     setIsChatVisible(true);
     assistant.startRecording();
+  };
+
+  const handleOpenUniversalInput = (context: UniversalInputContext) => {
+    setUniversalInputContext(context);
+    setIsUniversalInputOpen(true);
   };
 
   const renderView = () => {
@@ -130,6 +187,7 @@ export default function App() {
                 onSelectDeal={handleSelectDeal}
                 onSelectTask={handleSelectTask}
                 onBack={() => handleSetView('clients')}
+                onOpenUniversalInput={handleOpenUniversalInput}
             />
         }
     }
@@ -154,6 +212,10 @@ export default function App() {
     }
     
     switch (activeView) {
+      case 'data':
+        return <DataInsightsView kanbanApi={kanban} />;
+      case 'team':
+        return <TeamView />;
       case 'crm':
         return <CRMView 
             clients={kanban.clients}
@@ -166,7 +228,7 @@ export default function App() {
         return <BusinessLinesView 
             businessLines={kanban.businessLines} 
             onSelectBusinessLine={handleSelectBusinessLine}
-            onAddBusinessLine={kanban.addBusinessLine}
+            onOpenUniversalInput={handleOpenUniversalInput}
             onUpdateBusinessLine={kanban.updateBusinessLine}
           />;
       case 'clients':
@@ -174,7 +236,7 @@ export default function App() {
                   clients={kanban.clients} 
                   businessLines={kanban.businessLines}
                   onSelectClient={handleSelectClient}
-                  onAddClient={kanban.addClient}
+                  onOpenUniversalInput={handleOpenUniversalInput}
                   onUpdateClient={kanban.updateClient}
                />;
       case 'deals':
@@ -183,10 +245,10 @@ export default function App() {
                     clients={kanban.clients} 
                     businessLines={kanban.businessLines}
                     onSelectDeal={handleSelectDeal}
-                    onAddDeal={kanban.addDeal}
+                    onOpenUniversalInput={handleOpenUniversalInput}
                     onUpdateDeal={kanban.updateDeal}
                 />;
-      case 'tasks':
+      case 'homepage':
       default:
         return <TasksView 
             tasks={kanban.tasks} 
@@ -198,25 +260,37 @@ export default function App() {
             onSelectClient={handleSelectClient}
             onSelectDeal={handleSelectDeal}
             onSelectTask={handleSelectTask}
+            onOpenUniversalInput={handleOpenUniversalInput}
           />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 font-sans flex">
-      <Sidebar activeView={activeView} setActiveView={handleSetView} />
+    <div className="min-h-screen font-sans flex flex-col lg:flex-row bg-brevo-light-gray">
+      <Sidebar activeView={activeView} setActiveView={handleSetView} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       
-      <div className="flex-1 flex flex-col">
-        <header className="p-4 border-b border-gray-700">
-          <h1 className="text-2xl font-bold text-center text-indigo-400">
-            Voice First Kanban Copilot
-          </h1>
-          <p className="text-center text-gray-400">
-            Talk to olooAI.
-          </p>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="p-4 border-b border-brevo-border flex items-center justify-between z-10 bg-white/80 backdrop-blur-sm sticky top-0">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="lg:hidden text-brevo-text-secondary hover:text-brevo-text-primary">
+              <MenuIcon />
+            </button>
+            <h1 className="text-2xl font-bold text-brevo-cta">
+              olooAI
+            </h1>
+             <VoiceControl
+                isConnecting={assistant.isConnecting}
+                isRecording={assistant.isRecording}
+                startRecording={handleStartRecording}
+                stopRecording={assistant.stopRecording}
+              />
+          </div>
+           <p className="text-sm text-brevo-text-secondary hidden md:block">
+              Your AI Business Assistant, Walter.
+            </p>
         </header>
         
-        <main className="flex-1 p-4 lg:p-8 overflow-auto">
+        <main className="flex-1 p-4 lg:p-6 overflow-auto">
           {renderView()}
         </main>
       </div>
@@ -242,27 +316,19 @@ export default function App() {
           businessLines={kanban.businessLines}
           clients={kanban.clients}
           deals={kanban.deals}
+          onOpenUniversalInput={handleOpenUniversalInput}
         />
       )}
 
-      {!isChatVisible && (lastInteraction.user || lastInteraction.assistant) && (
-        <div className="fixed bottom-8 right-32 z-10">
-          <button
-            onClick={() => setIsChatVisible(true)}
-            title="Open last chat"
-            className="w-16 h-16 rounded-full flex items-center justify-center bg-gray-600 hover:bg-gray-700 text-white shadow-lg transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500"
-          >
-            <ChatIcon />
-          </button>
-        </div>
+      {isUniversalInputOpen && (
+          <UniversalInputModal 
+            isOpen={isUniversalInputOpen}
+            onClose={() => setIsUniversalInputOpen(false)}
+            onSave={(text) => kanban.processTextAndExecute(text, universalInputContext)}
+            context={universalInputContext}
+          />
       )}
-
-      <VoiceControl
-        isConnecting={assistant.isConnecting}
-        isRecording={assistant.isRecording}
-        startRecording={handleStartRecording}
-        stopRecording={assistant.stopRecording}
-      />
+      
     </div>
   );
 }

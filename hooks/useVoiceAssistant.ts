@@ -1,23 +1,29 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { LiveSession, LiveServerMessage } from '@google/genai';
+// FIX: LiveSession is not exported from @google/genai. It will be derived from connectToLiveSession.
+import { LiveServerMessage } from '@google/genai';
 import { connectToLiveSession, decode, decodeAudioData, createPcmBlob } from '../services/geminiService';
 import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType } from '../types';
+
+// FIX: Define LiveSession type based on the return type of connectToLiveSession.
+type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
 interface UseVoiceAssistantProps {
   onBoardItemCreate: (itemData: Partial<Task>) => string;
   onCrmEntryCreate: (data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => string;
   onTaskUpdate: (taskTitle: string, newStatus: KanbanStatus) => string;
   onBusinessLineCreate: (data: Omit<BusinessLine, 'id'>) => Promise<string> | string;
-  onClientCreate: (data: Omit<Client, 'id'>) => string;
-  onDealCreate: (data: Omit<Deal, 'id' | 'status'> & {clientName: string}) => string;
-  onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed') => string;
+  // FIX: Update onClientCreate to not require businessLineId, as AI provides businessLineName.
+  onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => string;
+  // FIX: Update onDealCreate to not require clientId or businessLineId, as AI provides names.
+  onDealCreate: (data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string; clientId?: string; businessLineId?: string;}) => string;
+  onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed - Won' | 'Closed - Lost') => string;
   onTurnComplete?: (userTranscript: string, assistantTranscript: string) => void;
-  onGetOpportunities?: (data: any) => Promise<string>;
-  onGetClientOpportunities?: (data: any) => Promise<string>;
-  onGetDealOpportunities?: (data: any) => Promise<string>;
+  onFindProspects?: (data: { businessLineName: string }) => Promise<string>;
   currentBusinessLineId?: string | null;
   currentClientId?: string | null;
   currentDealId?: string | null;
+  platformActivitySummary?: string;
 }
 
 export const useVoiceAssistant = ({ 
@@ -29,12 +35,11 @@ export const useVoiceAssistant = ({
   onDealCreate,
   onDealStatusUpdate,
   onTurnComplete,
-  onGetOpportunities,
-  onGetClientOpportunities,
-  onGetDealOpportunities,
+  onFindProspects,
   currentBusinessLineId,
   currentClientId,
   currentDealId,
+  platformActivitySummary,
 }: UseVoiceAssistantProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -121,45 +126,48 @@ export const useVoiceAssistant = ({
                 finalArgs.clientId = currentClientId;
             }
         } else if (currentBusinessLineId) {
-            if (['createBoardItem', 'createClient', 'createDeal', 'createCrmEntry'].includes(fc.name)) {
+            if (['createBoardItem', 'createClient', 'createDeal', 'createCrmEntry', 'findProspects'].includes(fc.name)) {
                 finalArgs.businessLineId = currentBusinessLineId;
             }
         }
         
         switch (fc.name) {
             case 'createCrmEntry':
-                result = onCrmEntryCreate(finalArgs);
+                // FIX: Cast finalArgs to the expected type for onCrmEntryCreate.
+                result = onCrmEntryCreate(finalArgs as { interactionType: CRMEntryType; content: string; clientName?: string; dealName?: string });
                 break;
             case 'createBoardItem':
                 result = onBoardItemCreate(finalArgs);
                 break;
             case 'moveTask':
-                result = onTaskUpdate(finalArgs.taskTitle, finalArgs.newStatus as KanbanStatus);
+                // FIX: Cast taskTitle to string to resolve type error.
+                result = onTaskUpdate(finalArgs.taskTitle as string, finalArgs.newStatus as KanbanStatus);
                 break;
             case 'createBusinessLine':
-                result = onBusinessLineCreate(finalArgs);
+                // FIX: Cast finalArgs to the expected type for onBusinessLineCreate.
+                result = onBusinessLineCreate(finalArgs as Omit<BusinessLine, 'id'>);
                 break;
             case 'createClient':
-                result = onClientCreate(finalArgs);
+                // FIX: Cast finalArgs to the expected type for onClientCreate, which doesn't expect a businessLineId.
+                result = onClientCreate(finalArgs as Omit<Client, 'id' | 'businessLineId'> & { businessLineName?: string });
                 break;
             case 'createDeal':
-                result = onDealCreate(finalArgs);
+                // FIX: Cast finalArgs to the expected type for onDealCreate, which doesn't expect IDs.
+                result = onDealCreate(finalArgs as Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string});
                 break;
             case 'updateDealStatus':
                 if (currentDealId) { // Should only be called from within a deal
-                    result = onDealStatusUpdate(currentDealId, finalArgs.newStatus);
+                    // FIX: Cast newStatus to the expected literal type.
+                    result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as 'Open' | 'Closed - Won' | 'Closed - Lost');
                 } else {
                     result = "I can only change the status of a deal you are currently viewing.";
                 }
                 break;
-            case 'getOpportunities':
-                if (onGetOpportunities) result = onGetOpportunities(finalArgs);
-                break;
-            case 'getClientOpportunities':
-                if (onGetClientOpportunities) result = onGetClientOpportunities(finalArgs);
-                break;
-            case 'getDealOpportunities':
-                if (onGetDealOpportunities) result = onGetDealOpportunities(finalArgs);
+            case 'findProspects':
+                if (onFindProspects) {
+                    // FIX: Cast finalArgs to the expected type for onFindProspects.
+                    result = onFindProspects(finalArgs as { businessLineName: string });
+                }
                 break;
         }
 
@@ -223,6 +231,16 @@ export const useVoiceAssistant = ({
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         nextStartTimeRef.current = 0;
         
+        const context = { currentBusinessLineId, currentClientId, currentDealId };
+        const systemInstruction = `You are Walter, a proactive, intelligent assistant for managing a Kanban board and CRM. Your primary job is to take action based on user commands, even with incomplete information. Prioritize action over asking for clarification.
+- Differentiate between logging past events (e.g., "I talked to...") using 'createCrmEntry', and scheduling future actions (e.g., "Remind me to...") using 'createBoardItem'.
+- If details are missing for a function call, use the available context and data to make a reasonable assumption and proceed. For example, if a business line isn't specified for a new client, a default will be chosen for you.
+- Never ask follow-up questions. Assume and act. The user can always edit the results later.
+- Announce any assumptions you make in your spoken confirmation. For example: 'Okay, I've created the client "New Corp" under the "Fumigation" business line.'
+- Keep your spoken responses brief, confident, and action-oriented.
+- CONTEXT: User is currently viewing: ${JSON.stringify(context)}.
+- CONTEXT: Recent platform activity: ${platformActivitySummary || 'None.'}`;
+
         sessionPromiseRef.current = connectToLiveSession({
             onOpen: () => {
                 setIsConnecting(false);
@@ -250,7 +268,7 @@ export const useVoiceAssistant = ({
             onClose: () => {
                 setIsRecording(false);
             },
-        });
+        }, systemInstruction);
     } catch (err) {
         console.error("Failed to start recording:", err);
         setError("Could not access microphone. Please check permissions.");

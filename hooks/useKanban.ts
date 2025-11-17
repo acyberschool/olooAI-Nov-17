@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion } from '../types';
+import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, PlatformInsight, FilterOptions } from '../types';
 import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries } from '../data/mockData';
 import { GoogleGenAI, Type } from '@google/genai';
+import { processTextMessage } from '../services/routerBrainService';
+import { trackEvent } from '../App';
 
 export const useKanban = () => {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -12,11 +14,84 @@ export const useKanban = () => {
   const [playbooks, setPlaybooks] = useState<Playbook[]>(initialPlaybooks);
   const [crmEntries, setCrmEntries] = useState<CRMEntry[]>(initialCRMEntries);
 
+  const addDocument = useCallback((file: File | {name: string, content: string}, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string): Document => {
+    
+    let url = '#';
+    if (!(file instanceof File)) {
+        // Mock google doc link
+        url = `https://docs.google.com/document/d/mock-${Date.now()}/edit`;
+    } else {
+        url = URL.createObjectURL(file);
+    }
+    
+    const newDocument: Document = {
+      id: `doc-${Date.now()}`,
+      name: file.name,
+      category,
+      ownerId,
+      ownerType,
+      url,
+      createdAt: new Date().toISOString(),
+      note,
+    };
+    setDocuments(prev => [newDocument, ...prev]);
+    return newDocument;
+  }, []);
+  
+  const _addCRMEntryToState = (entryData: Omit<CRMEntry, 'id' | 'suggestions'>) => {
+     const newEntry: CRMEntry = {
+        id: `crm-${Date.now()}`,
+        suggestions: [], 
+        ...entryData
+     };
+     setCrmEntries(prev => [newEntry, ...prev]);
+     trackEvent('create', 'CRM Entry', entryData.type);
+  };
+
+  const _generateAndSetSubtasks = async (taskId: string, taskTitle: string) => {
+      try {
+        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const prompt = `Break down the following task into a simple checklist of 3-5 sub-tasks. Return ONLY a valid JSON array of strings. For example: ["Sub-task 1", "Sub-task 2"].\n\nTask: "${taskTitle}"`;
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                }
+            }
+        });
+        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        const subTaskTexts: string[] = JSON.parse(jsonString);
+        
+        const subTasks = subTaskTexts.map((text, index) => ({
+            id: `sub-${taskId}-${index}`,
+            text,
+            isDone: false,
+        }));
+
+        setTasks(prev => prev.map(task => 
+            task.id === taskId ? { ...task, subTasks } : task
+        ));
+      } catch (e) {
+          console.error("Error generating sub-tasks:", e);
+      }
+  };
+
+
   const addTask = useCallback((itemData: Partial<Omit<Task, 'id' | 'status' | 'type'>> & { itemType?: TaskType, title: string, businessLineName?: string }) => {
     let businessLineId = itemData.businessLineId;
     if (!businessLineId && itemData.businessLineName) {
         const businessLine = businessLines.find(bl => bl.name.toLowerCase() === itemData.businessLineName?.toLowerCase());
         businessLineId = businessLine?.id;
+    }
+    
+    if (!businessLineId && itemData.clientId) {
+        const client = clients.find(c => c.id === itemData.clientId);
+        if (client) businessLineId = client.businessLineId;
     }
 
     const newTask: Task = {
@@ -31,8 +106,22 @@ export const useKanban = () => {
     delete (newTask as any).businessLineName;
 
     setTasks((prevTasks) => [newTask, ...prevTasks]);
+    
+    _generateAndSetSubtasks(newTask.id, newTask.title);
+    
+    if (newTask.clientId) {
+      _addCRMEntryToState({
+          clientId: newTask.clientId,
+          dealId: newTask.dealId,
+          createdAt: new Date().toISOString(),
+          type: 'ai_action',
+          summary: `AI created task: "${newTask.title}"`,
+          rawContent: `AI created task: "${newTask.title}"`
+      });
+    }
+    trackEvent('create', 'Task', newTask.type);
     return `${newTask.type} "${newTask.title}" created successfully.`;
-  }, [businessLines]);
+  }, [businessLines, clients]);
 
   const generateAndAddPlaybook = useCallback(async (businessLine: BusinessLine) => {
     try {
@@ -70,7 +159,8 @@ export const useKanban = () => {
             businessLineId: businessLine.id,
             steps,
         };
-        setPlaybooks(prev => [...prev, newPlaybook]);
+        // Remove existing playbook if it exists, then add the new one.
+        setPlaybooks(prev => [...prev.filter(p => p.businessLineId !== businessLine.id), newPlaybook]);
     } catch (e) {
         console.error("Error generating playbook:", e);
     }
@@ -86,6 +176,7 @@ export const useKanban = () => {
     };
     setBusinessLines(prev => [newBusinessLine, ...prev]);
     await generateAndAddPlaybook(newBusinessLine);
+    trackEvent('create', 'Business Line', data.name);
     return `Business line "${data.name}" created.`;
   }, [businessLines, generateAndAddPlaybook]);
 
@@ -99,22 +190,26 @@ export const useKanban = () => {
       return `Playbook updated.`;
   }, []);
   
-  const addClient = useCallback((data: Omit<Client, 'id'> & { businessLineName?: string }) => {
+  const addClient = useCallback((data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string }) => {
     if (clients.some(c => c.name.toLowerCase() === data.name.toLowerCase())) {
       return `Client "${data.name}" already exists.`;
     }
     
-    let foundBusinessLineId = data.businessLineId;
-    if (data.businessLineName && !foundBusinessLineId) {
-      const businessLine = businessLines.find(bl => bl.name.toLowerCase() === data.businessLineName?.toLowerCase());
-      if (!businessLine) {
-          return `I couldn't find the business line "${data.businessLineName}". Please create it first.`;
-      }
-      foundBusinessLineId = businessLine.id;
+    let businessLine: BusinessLine | undefined;
+    let assumptionMessage = '';
+
+    if (data.businessLineId) {
+        businessLine = businessLines.find(bl => bl.id === data.businessLineId);
+    } else if (data.businessLineName) {
+        businessLine = businessLines.find(bl => bl.name.toLowerCase() === data.businessLineName?.toLowerCase());
     }
-    
-    if (!foundBusinessLineId) {
-        return "Could not create client: Business Line is required.";
+
+    if (!businessLine) {
+        if (!businessLines || businessLines.length === 0) {
+            return "To create a client, you first need to set up at least one business line.";
+        }
+        businessLine = businessLines[0];
+        assumptionMessage = `, and I've placed them under "${businessLine.name}" by default. You can change this later`;
     }
 
     const newClient: Client = {
@@ -122,10 +217,18 @@ export const useKanban = () => {
       name: data.name,
       description: data.description,
       aiFocus: data.aiFocus,
-      businessLineId: foundBusinessLineId,
+      businessLineId: businessLine.id,
     };
     setClients(prev => [newClient, ...prev]);
-    return `Client "${data.name}" created.`;
+    _addCRMEntryToState({
+        clientId: newClient.id,
+        createdAt: new Date().toISOString(),
+        type: 'ai_action',
+        summary: `AI created client profile for "${newClient.name}"`,
+        rawContent: `AI created client profile for "${newClient.name}"`
+    });
+    trackEvent('create', 'Client', data.name);
+    return `Client "${data.name}" created${assumptionMessage}.`;
   }, [clients, businessLines]);
 
   const updateClient = useCallback((id: string, data: Partial<Omit<Client, 'id'>>) => {
@@ -133,7 +236,7 @@ export const useKanban = () => {
     return `Client "${data.name}" updated.`;
   }, []);
 
-  const addDeal = useCallback((data: Omit<Deal, 'id' | 'status' > & { clientName: string }) => {
+  const addDeal = useCallback((data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string, clientId?: string, businessLineId?: string }) => {
     const client = clients.find(c => c.id === data.clientId || c.name.toLowerCase() === data.clientName.toLowerCase());
     if (!client) {
         return `I couldn't find the client "${data.clientName}". Please create them first.`;
@@ -152,8 +255,21 @@ export const useKanban = () => {
       clientId: client.id,
       businessLineId: data.businessLineId || client.businessLineId,
       playbookId: playbook?.id,
+      value: data.value,
+      currency: data.currency,
+      revenueModel: data.revenueModel,
+      amountPaid: 0,
     };
     setDeals(prev => [newDeal, ...prev]);
+     _addCRMEntryToState({
+        clientId: newDeal.clientId,
+        dealId: newDeal.id,
+        createdAt: new Date().toISOString(),
+        type: 'ai_action',
+        summary: `AI created deal: "${newDeal.name}" for ${newDeal.currency} ${newDeal.value}`,
+        rawContent: `AI created deal: "${newDeal.name}" for ${newDeal.currency} ${newDeal.value}`
+    });
+    trackEvent('create', 'Deal', data.name);
     return `Deal "${data.name}" created for client "${data.clientName}".`;
   }, [deals, clients, playbooks]);
 
@@ -161,76 +277,6 @@ export const useKanban = () => {
       setDeals(prev => prev.map(d => d.id === id ? { ...d, ...data } : d));
       return `Deal updated.`;
   }, []);
-
-  const addDocument = useCallback((file: File, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string): Document => {
-    const newDocument: Document = {
-      id: `doc-${Date.now()}`,
-      name: file.name,
-      category,
-      ownerId,
-      ownerType,
-      url: URL.createObjectURL(file), // Mock URL
-      createdAt: new Date().toISOString(),
-      note,
-    };
-    setDocuments(prev => [newDocument, ...prev]);
-    return newDocument;
-  }, []);
-
-
-  const addCRMEntry = useCallback(async (clientId: string, rawContent: string, type: CRMEntryType, dealId?: string, file?: File) => {
-    try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const client = clients.find(c => c.id === clientId);
-        if (!client) return;
-
-        let newDocumentId: string | undefined = undefined;
-        if (file) {
-            const newDoc = addDocument(file, 'Templates', clientId, 'client', `Attachment for CRM note on ${new Date().toLocaleDateString()}`);
-            newDocumentId = newDoc.id;
-        }
-
-        // 1. Get Summary
-        const summaryPrompt = `Summarize the following interaction with a client in one sentence. Client: ${client?.name}. Interaction: "${rawContent}"`;
-        const summaryResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: summaryPrompt });
-        const summary = summaryResponse.text.trim();
-        
-        // 2. Get Suggestions
-        const suggestionsPrompt = `Read this interaction with a client and suggest 1-2 concrete, actionable next-step tasks. Return ONLY a valid JSON array of objects, where each object has "text" and "taskTitle". If no action is needed, return an empty array [].\n\nInteraction: "${rawContent}"`;
-        const suggestionsResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: suggestionsPrompt });
-        let suggestionsJson = suggestionsResponse.text.trim().replace(/^```json\s*|```\s*$/g, '');
-        const suggestionsRaw = JSON.parse(suggestionsJson);
-
-        const newSuggestions: Suggestion[] = suggestionsRaw.map((s: any) => ({
-            id: `sugg-${Date.now()}-${Math.random()}`,
-            text: s.text,
-            taskData: { 
-                title: s.taskTitle,
-                clientId: clientId,
-                dealId: dealId,
-                businessLineId: client?.businessLineId
-            }
-        }));
-
-        const newEntry: CRMEntry = {
-            id: `crm-${Date.now()}`,
-            clientId,
-            dealId,
-            type,
-            rawContent,
-            summary,
-            createdAt: new Date().toISOString(),
-            suggestions: newSuggestions,
-            documentId: newDocumentId,
-        };
-
-        setCrmEntries(prev => [newEntry, ...prev]);
-
-    } catch (e) {
-        console.error("Error processing CRM entry:", e);
-    }
-  }, [clients, addDocument]);
   
   const addCRMEntryFromVoice = useCallback((data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => {
     if (!data.clientName) {
@@ -245,19 +291,29 @@ export const useKanban = () => {
         const deal = deals.find(d => d.clientId === client.id && d.name.toLowerCase() === data.dealName?.toLowerCase());
         dealId = deal?.id;
     }
-
-    addCRMEntry(client.id, data.content, data.interactionType, dealId);
+    _addCRMEntryToState({
+        clientId: client.id,
+        dealId: dealId,
+        createdAt: new Date().toISOString(),
+        type: data.interactionType,
+        summary: data.content, // Voice assistant should provide a good summary
+        rawContent: data.content,
+    });
     return `Note added to ${client.name}'s timeline.`;
-  }, [clients, deals, addCRMEntry]);
+  }, [clients, deals]);
 
   const generateNextStepSuggestions = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
-    if (!task || !task.dealId) return;
+    if (!task) return;
 
     const deal = deals.find(d => d.id === task.dealId);
-    if (!deal) return;
-
-    const playbook = playbooks.find(p => p.id === deal.playbookId);
+    let playbook: Playbook | undefined;
+    if (deal) {
+      playbook = playbooks.find(p => p.id === deal.playbookId);
+    } else if (task.businessLineId) {
+      playbook = playbooks.find(p => p.businessLineId === task.businessLineId);
+    }
+    
     let nextStep: PlaybookStep | undefined;
     if (playbook && task.playbookStepId) {
         const currentStepIndex = playbook.steps.findIndex(s => s.id === task.playbookStepId);
@@ -269,16 +325,17 @@ export const useKanban = () => {
     try {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const client = clients.find(c => c.id === deal.clientId);
-        const lastCRMEntry = crmEntries.filter(c => c.clientId === deal.clientId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-        const dealDocuments = documents.filter(doc => doc.ownerId === deal.id).map(d => d.name).join(', ');
+        const client = clients.find(c => c.id === task.clientId);
+        const lastCRMEntry = crmEntries.filter(c => c.clientId === task.clientId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        const dealDocuments = documents.filter(doc => doc.ownerId === deal?.id).map(d => d.name).join(', ');
 
-        let prompt = `A task was just completed for a deal. Based on all the context, suggest 1-2 concrete, actionable next-step tasks.
+        let prompt = `A task was just completed. Based on all the context, suggest 1-2 concrete, actionable next-step tasks. Use your vast knowledge of business processes if no playbook is available.
         Return ONLY a valid JSON array of objects, where each object has a "text" (the suggestion for the user) and a "taskTitle" (the title for the new task).
         
         CONTEXT:
         - Completed Task: "${task.title}"
-        - Deal: "${deal.name}" (${deal.description}) for client ${client?.name}
+        ${client ? `- Client: "${client.name}"` : ''}
+        ${deal ? `- Deal: "${deal.name}" (${deal.description})` : ''}
         - Last conversation with client: ${lastCRMEntry ? `"${lastCRMEntry.summary}"` : "None recorded."}
         - Relevant documents for this deal: ${dealDocuments || 'None'}
         `;
@@ -288,14 +345,10 @@ export const useKanban = () => {
         } else if (playbook) {
             prompt += `- This task wasn't part of our standard playbook. Use your own reasoning to figure out the best next step to move the deal forward.`
         } else {
-            prompt += `- There is no standard playbook. Use your own reasoning to figure out the best next step to move the deal forward.`
+            prompt += `- There is no standard playbook. Use your vast knowledge of business processes to figure out the best next step.`
         }
         
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt
-        });
-
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
         let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
         const suggestionsRaw = JSON.parse(jsonString);
         const newSuggestions: Suggestion[] = suggestionsRaw.map((s: any) => ({
@@ -303,13 +356,17 @@ export const useKanban = () => {
             text: s.text,
             taskData: { 
                 title: s.taskTitle,
-                dealId: deal.id,
-                clientId: deal.clientId,
-                businessLineId: deal.businessLineId
+                dealId: deal?.id,
+                clientId: client?.id,
+                businessLineId: task.businessLineId
             }
         }));
-
-        setDeals(prev => prev.map(d => d.id === deal.id ? { ...d, suggestions: newSuggestions } : d));
+        
+        if (deal) {
+            setDeals(prev => prev.map(d => d.id === deal.id ? { ...d, suggestions: newSuggestions } : d));
+        } else if (client) {
+            setClients(prev => prev.map(c => c.id === client.id ? { ...c, suggestions: newSuggestions } : c));
+        }
 
     } catch (e) {
         console.error("Error generating next step:", e);
@@ -330,29 +387,23 @@ export const useKanban = () => {
     });
 
     if (originalTask && originalTask.status !== newStatus) {
+        trackEvent('update_status', 'Task', newStatus, parseInt(originalTask.id.replace('task-', '')));
         if (newStatus === KanbanStatus.Done) {
             await generateNextStepSuggestions(taskId);
         } else if (originalTask.clientId) {
-            // Log other status changes to CRM for a paper trail
             let noteContent = '';
             let entryType: CRMEntryType = 'ai_action';
             switch(newStatus) {
-                case KanbanStatus.Doing:
-                    noteContent = `Started task: "${originalTask.title}"`;
-                    break;
-                case KanbanStatus.ToDo:
-                    noteContent = `Task moved back to To Do: "${originalTask.title}"`;
-                    break;
-                case KanbanStatus.Terminated:
-                    noteContent = `Task terminated: "${originalTask.title}"`;
-                    break;
+                case KanbanStatus.Doing: noteContent = `Started task: "${originalTask.title}"`; break;
+                case KanbanStatus.ToDo: noteContent = `Task moved back to To Do: "${originalTask.title}"`; break;
+                case KanbanStatus.Terminated: noteContent = `Task terminated: "${originalTask.title}"`; break;
             }
             if (noteContent) {
-                await addCRMEntry(originalTask.clientId, noteContent, entryType, originalTask.dealId);
+                _addCRMEntryToState({ clientId: originalTask.clientId, dealId: originalTask.dealId, createdAt: new Date().toISOString(), type: entryType, summary: noteContent, rawContent: noteContent });
             }
         }
     }
-  }, [generateNextStepSuggestions, addCRMEntry]);
+  }, [generateNextStepSuggestions]);
 
   const updateTaskStatusByTitle = useCallback((taskTitle: string, newStatus: KanbanStatus) => {
     let taskUpdated = false;
@@ -390,8 +441,15 @@ export const useKanban = () => {
     try {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Based on the following business line, provide 3 simple, actionable opportunities. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings. For example: ["Idea 1", "Idea 2", "Idea 3"]\n\nName: ${businessLine.name}\nDescription: ${businessLine.description}\nCustomers: ${businessLine.customers}\nAI Focus: ${businessLine.aiFocus}`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        const prompt = `Based on the following business line, perform a deep search online for additional insights, then provide 3 simple, actionable opportunities. State that the suggestion is based on your knowledge and external research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings. For example: ["Based on my knowledge and recent market trends, you should..."]\n\nName: ${businessLine.name}\nDescription: ${businessLine.description}\nCustomers: ${businessLine.customers}\nAI Focus: ${businessLine.aiFocus}`;
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+            }
+        });
         let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
         const ideas: string[] = JSON.parse(jsonString);
         return ideas.map((idea, index) => ({ id: `opp-${Date.now()}-${index}`, text: idea }));
@@ -406,8 +464,15 @@ export const useKanban = () => {
         if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const businessLine = businessLines.find(bl => bl.id === client.businessLineId);
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Based on the following client, provide 3 simple, actionable opportunities to grow the business relationship. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings. For example: ["Idea 1", "Idea 2", "Idea 3"]\n\nClient Name: ${client.name}\nDescription: ${client.description}\nBusiness Line: ${businessLine?.name}\nAI Focus: ${client.aiFocus}`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        const prompt = `Based on the following client, perform a deep search online for news and trends related to them, then provide 3 simple, actionable opportunities to grow the business relationship. State that the suggestion is based on your knowledge and external research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.\n\nClient Name: ${client.name}\nDescription: ${client.description}\nBusiness Line: ${businessLine?.name}\nAI Focus: ${client.aiFocus}`;
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+            }
+        });
         let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
         const ideas: string[] = JSON.parse(jsonString);
         return ideas.map((idea, index) => ({ id: `opp-client-${Date.now()}-${index}`, text: idea }));
@@ -423,8 +488,15 @@ export const useKanban = () => {
         const client = clients.find(c => c.id === deal.clientId);
         const businessLine = businessLines.find(bl => bl.id === deal.businessLineId);
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Based on the following deal, provide 3 simple, actionable next steps or upsell opportunities. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings. For example: ["Idea 1", "Idea 2", "Idea 3"]\n\nDeal Name: ${deal.name}\nDescription: ${deal.description}\nStatus: ${deal.status}\nClient: ${client?.name}\nBusiness Line: ${businessLine?.name}`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        const prompt = `Based on the following deal, perform a deep search online for industry trends, then provide 3 simple, actionable next steps or upsell opportunities. State that the suggestion is based on your knowledge and external research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.\n\nDeal Name: ${deal.name}\nDescription: ${deal.description}\nStatus: ${deal.status}\nClient: ${client?.name}\nBusiness Line: ${businessLine?.name}`;
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+            }
+        });
         let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
         const ideas: string[] = JSON.parse(jsonString);
         return ideas.map((idea, index) => ({ id: `opp-deal-${Date.now()}-${index}`, text: idea }));
@@ -464,6 +536,270 @@ export const useKanban = () => {
     }
   }, []);
 
+  const logPaymentOnDeal = useCallback((dealId: string, amount: number, note: string) => {
+    let dealToUpdate: Deal | undefined;
+    setDeals(prevDeals => {
+      const newDeals = prevDeals.map(d => {
+        if (d.id === dealId) {
+          dealToUpdate = d;
+          const newAmountPaid = d.amountPaid + amount;
+          const newStatus = newAmountPaid >= d.value ? 'Closed - Won' : d.status;
+          return { ...d, amountPaid: newAmountPaid, status: newStatus };
+        }
+        return d;
+      });
+      return newDeals;
+    });
+
+    if (dealToUpdate) {
+        _addCRMEntryToState({ 
+            clientId: dealToUpdate.clientId, 
+            dealId: dealToUpdate.id, 
+            createdAt: new Date().toISOString(), 
+            type: 'ai_action', 
+            summary: `Logged payment of ${dealToUpdate.currency} ${amount} for deal "${dealToUpdate.name}". Note: ${note}`,
+            rawContent: `Logged payment of ${dealToUpdate.currency} ${amount}. Note: ${note}`
+        });
+        return `Payment of ${amount} logged for "${dealToUpdate.name}".`;
+    }
+    return 'Could not find deal to log payment.';
+  }, []);
+
+  const findProspects = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<Prospect[]> => {
+    try {
+      if (!process.env.API_KEY) throw new Error("API Key is not configured.");
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = customPrompt || `Based on my business line "${businessLine.name}" (${businessLine.description}), perform a deep search online, then find 5 potential new clients. For each, provide a name and a likely need. Explicitly state this is based on both your internal knowledge and external research. Return ONLY a valid JSON array of objects, where each object has "name" and "likelyNeed".`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: { name: { type: Type.STRING }, likelyNeed: { type: Type.STRING } },
+              required: ['name', 'likelyNeed'],
+            },
+          },
+        },
+      });
+      const prospectsRaw = JSON.parse(response.text.trim());
+      return prospectsRaw.map((p: any, i: number) => ({ ...p, id: `prospect-${Date.now()}-${i}` }));
+    } catch (e) {
+      console.error("Error finding prospects:", e);
+      return [];
+    }
+  }, []);
+
+  const findProspectsByName = useCallback(async ({ businessLineName }: { businessLineName: string }): Promise<string> => {
+    const businessLine = businessLines.find(bl => bl.name.toLowerCase() === businessLineName.toLowerCase());
+    if (!businessLine) {
+        return `I couldn't find a business line named "${businessLineName}".`;
+    }
+    try {
+        const prospects = await findProspects(businessLine);
+        if (prospects.length === 0) {
+            return `I couldn't find any new prospects for "${businessLineName}" right now.`;
+        }
+        const prospectNames = prospects.map(p => p.name).join(', ');
+        return `Based on my research, I found a few prospects for ${businessLineName}: ${prospectNames}. You can see the full list in the Prospects tab.`;
+    } catch (e) {
+        console.error("Error finding prospects by name:", e);
+        return `Sorry, I had trouble searching for prospects for "${businessLineName}". Please try again from the Prospects tab.`;
+    }
+  }, [businessLines, findProspects]);
+
+  const toggleSubTask = useCallback((taskId: string, subTaskId: string) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id === taskId && task.subTasks) {
+        return {
+          ...task,
+          subTasks: task.subTasks.map(sub => 
+            sub.id === subTaskId ? { ...sub, isDone: !sub.isDone } : sub
+          )
+        };
+      }
+      return task;
+    }));
+  }, []);
+
+  const generateSocialMediaIdeas = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<string[]> => {
+    try {
+        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const prompt = customPrompt || `Based on my business line "${businessLine.name}" and recent online trends, generate 5 timely social media post ideas. State that this is based on your knowledge and external research. Return ONLY a valid JSON array of strings.`;
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+            }
+        });
+        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error("Error generating social media ideas:", e);
+        return ["Sorry, I had trouble generating ideas right now."];
+    }
+  }, []);
+
+  const processTextAndExecute = useCallback(async (text: string, context: any) => {
+    try {
+        const knownData = {
+            clients: clients.map(c => c.name),
+            deals: deals.map(d => d.name),
+            businessLines: businessLines.map(b => b.name)
+        };
+        const platformActivitySummary = `Last 3 tasks: ${tasks.slice(0,3).map(t => t.title).join(', ')}. Last 3 CRM notes: ${crmEntries.slice(0,3).map(c => c.summary).join(', ')}.`;
+        const result = await processTextMessage(text, knownData, context, platformActivitySummary);
+
+        if (result.action === 'ignore') {
+            return;
+        }
+
+        if (result.action === 'create_business_line' && result.businessLine) {
+            await addBusinessLine(result.businessLine);
+        }
+        if (result.action === 'create_client' && result.client) {
+            addClient(result.client);
+        }
+        if (result.action === 'create_deal' && result.deal) {
+            addDeal(result.deal);
+        }
+        if (result.action === 'update_task' && result.tasks.length > 0) {
+            const taskToUpdate = result.tasks[0];
+            if (taskToUpdate.update_hint) {
+                updateTaskStatusByTitle(taskToUpdate.update_hint, KanbanStatus.Done);
+            }
+        }
+        
+        if (result.action === 'create_note' || result.action === 'both') {
+            if (result.note) {
+                let clientId = context.clientId;
+                 if (!clientId && result.tasks.length > 0 && result.tasks[0].client_name) {
+                    const client = clients.find(c => c.name.toLowerCase() === result.tasks[0].client_name?.toLowerCase());
+                    if (client) clientId = client.id;
+                } else if (!clientId && result.client?.name) {
+                    const client = clients.find(c => c.name.toLowerCase() === result.client!.name.toLowerCase());
+                    if (client) clientId = client.id;
+                }
+                
+                if(clientId) {
+                    _addCRMEntryToState({
+                        clientId,
+                        dealId: context.dealId,
+                        createdAt: new Date().toISOString(),
+                        type: result.note.channel,
+                        summary: result.note.text,
+                        rawContent: text,
+                    });
+                }
+            }
+        }
+        
+        if (result.action === 'create_task' || result.action === 'both') {
+            result.tasks.forEach(task => {
+                const client = clients.find(c => c.name.toLowerCase() === task.client_name?.toLowerCase());
+                const deal = deals.find(d => d.name.toLowerCase() === task.deal_name?.toLowerCase());
+                addTask({
+                    title: task.title,
+                    dueDate: task.due_date || undefined,
+                    clientId: client?.id,
+                    dealId: deal?.id
+                });
+            });
+        }
+    } catch (e) {
+        console.error("Error processing text command:", e);
+    }
+    }, [clients, deals, businessLines, addBusinessLine, addClient, addDeal, updateTaskStatusByTitle, addTask, tasks, crmEntries]);
+    
+  const regeneratePlaybook = useCallback(async (businessLine: BusinessLine) => {
+    await generateAndAddPlaybook(businessLine);
+  }, [generateAndAddPlaybook]);
+
+  const getClientPulse = useCallback(async (client: Client, filters: FilterOptions): Promise<ClientPulse[]> => {
+    try {
+        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const prompt = `Based on external research, find recent public social media posts or news articles mentioning "${client.name}". Apply the following filters: ${JSON.stringify(filters)}. For each result, provide the source, content snippet, a URL, and a date. Return ONLY a valid JSON array of objects with keys: "source", "content", "url", "date".`;
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        const pulseItems: Omit<ClientPulse, 'id'>[] = JSON.parse(jsonString);
+        return pulseItems.map((item, index) => ({ ...item, id: `pulse-${Date.now()}-${index}` }));
+    } catch (e) {
+        console.error("Error getting client pulse:", e);
+        return [];
+    }
+  }, []);
+
+  const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: FilterOptions): Promise<{ insights: CompetitorInsight[], trends: SearchTrend[] }> => {
+    try {
+        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const prompt = `For a business in "${businessLine.name}", perform a deep search online. Apply these filters: ${JSON.stringify(filters)}.
+        1. Identify 2-3 key competitors and provide a recent insight for each.
+        2. Identify 2-3 recent customer search trends related to this business.
+        Return ONLY a valid JSON object with two keys: "insights" (an array of objects with "competitorName", "insight", "source") and "trends" (an array of objects with "keyword", "insight").`;
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        let jsonString = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        const results = JSON.parse(jsonString);
+        return {
+            insights: results.insights.map((item: any, i: number) => ({...item, id: `ci-${Date.now()}-${i}`})),
+            trends: results.trends.map((item: any, i: number) => ({...item, id: `st-${Date.now()}-${i}`})),
+        };
+    } catch (e) {
+        console.error("Error getting competitor insights:", e);
+        return { insights: [], trends: [] };
+    }
+  }, []);
+
+  const generateDocumentFromSubtask = useCallback(async (task: Task, subtaskText: string): Promise<Document | null> => {
+    try {
+        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const prompt = `Based on the task "${task.title}", generate the content for the following sub-task: "${subtaskText}". Return only the document content.`;
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+        const content = response.text.trim();
+        const docName = `${subtaskText}.gdoc`; // Mock Google Doc
+        
+        let ownerId = task.dealId || task.clientId || task.businessLineId;
+        let ownerType: DocumentOwnerType = task.dealId ? 'deal' : (task.clientId ? 'client' : 'businessLine');
+
+        if (!ownerId) return null; // Can't create a doc without an owner
+
+        const newDoc = addDocument({ name: docName, content }, 'Templates', ownerId, ownerType);
+
+        _addCRMEntryToState({
+            clientId: task.clientId!,
+            dealId: task.dealId,
+            createdAt: new Date().toISOString(),
+            type: 'ai_action',
+            summary: `AI generated document: "${docName}" for task "${task.title}"`,
+            rawContent: `AI generated document from subtask: "${subtaskText}"`,
+            documentId: newDoc.id,
+        });
+
+        return newDoc;
+    } catch (e) {
+        console.error("Error generating document from subtask:", e);
+        return null;
+    }
+  }, [addDocument]);
+  
+  const getPlatformInsights = useCallback((): PlatformInsight[] => {
+    // This is a mock function. In a real app, this would query a database
+    // or an analytics service where AI-derived insights are stored.
+    return [
+      { id: 'pi-1', text: "You're most productive on Tuesday mornings. 75% of your 'Done' tasks last week were completed then." },
+      { id: 'pi-2', text: "The 'Fumigation' business line has the fastest deal-closing time, averaging 8 days from creation to 'Closed-Won'." },
+      { id: 'pi-3', text: "You haven't logged a conversation with 'Bright Schools' in over 2 weeks. It might be time to follow up." },
+    ];
+  }, []);
+
   return { 
     tasks, 
     businessLines,
@@ -480,7 +816,6 @@ export const useKanban = () => {
     updateClient,
     addDeal,
     updateDeal,
-    addCRMEntry,
     addCRMEntryFromVoice,
     updateTaskStatusById, 
     updateTaskStatusByTitle,
@@ -492,5 +827,16 @@ export const useKanban = () => {
     deleteDocument,
     generateDocumentDraft,
     generateMarketingCollateralPrompt,
+    logPaymentOnDeal,
+    findProspects,
+    findProspectsByName,
+    toggleSubTask,
+    generateSocialMediaIdeas,
+    processTextAndExecute,
+    regeneratePlaybook,
+    getClientPulse,
+    getCompetitorInsights,
+    generateDocumentFromSubtask,
+    getPlatformInsights,
   };
 };

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Client, BusinessLine } from '../types';
 
-interface AddClientModalProps {
+interface EditClientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<Client, 'id'> | Client) => void;
-  client: Client | null;
+  onSave: (data: Client) => void;
+  client: Client;
   businessLines: BusinessLine[];
 }
 
-const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave, client, businessLines }) => {
+const AddClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSave, client, businessLines }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -25,10 +25,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         aiFocus: client.aiFocus,
         businessLineId: client.businessLineId,
       });
-    } else {
-      setFormData({ name: '', description: '', aiFocus: '', businessLineId: businessLines[0]?.id || '' });
     }
-  }, [client, isOpen, businessLines]);
+  }, [client, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -37,22 +35,18 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (client) {
-      onSave({ ...client, ...formData });
-    } else {
-      onSave(formData as Omit<Client, 'id'>);
-    }
+    onSave({ ...client, ...formData });
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-lg border border-gray-700" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold mb-6 text-white">{client ? 'Edit' : 'Add'} Client</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-lg border border-[#E5E7EB]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-semibold mb-6 text-[#111827]">Edit Client</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">Client name</label>
+            <label htmlFor="name" className="block text-sm font-medium text-[#111827] mb-1">Client name</label>
             <input
               type="text"
               id="name"
@@ -60,12 +54,12 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
               value={formData.name}
               onChange={handleChange}
               placeholder="e.g., ABC Limited"
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
               required
             />
           </div>
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">Who are they?</label>
+            <label htmlFor="description" className="block text-sm font-medium text-[#111827] mb-1">Who are they?</label>
             <input
               type="text"
               id="description"
@@ -73,18 +67,18 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
               value={formData.description}
               onChange={handleChange}
               placeholder="e.g., A large logistics company with multiple warehouses."
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
               required
             />
           </div>
           <div>
-            <label htmlFor="businessLineId" className="block text-sm font-medium text-gray-300 mb-1">Which part of your business is this for?</label>
+            <label htmlFor="businessLineId" className="block text-sm font-medium text-[#111827] mb-1">Which part of your business is this for?</label>
             <select
               id="businessLineId"
               name="businessLineId"
               value={formData.businessLineId}
               onChange={handleChange}
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
               required
             >
               <option value="" disabled>Select a business line</option>
@@ -94,7 +88,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
             </select>
           </div>
            <div>
-            <label htmlFor="aiFocus" className="block text-sm font-medium text-gray-300 mb-1">What should AI look for with this client?</label>
+            <label htmlFor="aiFocus" className="block text-sm font-medium text-[#111827] mb-1">What should AI look for with this client?</label>
             <input
               type="text"
               id="aiFocus"
@@ -102,13 +96,13 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
               value={formData.aiFocus}
               onChange={handleChange}
               placeholder="e.g., Focus on securing a multi-year contract."
-              className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
               required
             />
           </div>
           <div className="flex justify-end space-x-4 pt-4">
-            <button type="button" onClick={onClose} className="py-2 px-4 rounded-md text-gray-300 hover:bg-gray-700">Cancel</button>
-            <button type="submit" className="py-2 px-4 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Save</button>
+            <button type="button" onClick={onClose} className="py-2 px-4 rounded-md text-[#111827] hover:bg-gray-100">Cancel</button>
+            <button type="submit" className="py-2 px-4 rounded-md bg-[#15803D] hover:bg-[#166534] text-white font-semibold">Save Changes</button>
           </div>
         </form>
       </div>

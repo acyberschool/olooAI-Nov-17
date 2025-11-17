@@ -1,9 +1,12 @@
+
 import React from 'react';
 import { View } from '../App';
 
 interface SidebarProps {
   activeView: View;
   setActiveView: (view: View) => void;
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
 }
 
 const NavItem: React.FC<{
@@ -11,70 +14,64 @@ const NavItem: React.FC<{
   view: View;
   activeView: View;
   onClick: (view: View) => void;
-  // Fix: Changed JSX.Element to React.ReactElement to resolve "Cannot find namespace 'JSX'" error.
-  icon: React.ReactElement;
+  icon: React.ReactElement<{ className?: string }>;
 }> = ({ label, view, activeView, onClick, icon }) => {
   const isActive = activeView === view;
   return (
     <li
       onClick={() => onClick(view)}
-      className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-200 ${
+      className={`flex items-center p-3 rounded-full cursor-pointer transition-colors duration-200 relative ${
         isActive
-          ? 'bg-indigo-600 text-white shadow-lg'
-          : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+          ? 'bg-brevo-mint-active text-brevo-text-primary'
+          : 'text-brevo-text-secondary hover:bg-gray-100'
       }`}
     >
-      {icon}
+      {React.cloneElement(icon, { className: 'h-6 w-6 flex-shrink-0'})}
       <span className="ml-3 font-medium">{label}</span>
     </li>
   );
 };
 
-const BoardIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2z" />
-    </svg>
-);
-const BusinessIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-4h1m-1 4h1m-1-4h1m-1-4h1" />
-    </svg>
-);
-const ClientsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-);
-const DealsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-);
+const HomeIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>;
+const BusinessIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3.75h1.5m-1.5 3.75h1.5m3-3.75h1.5m-1.5 3.75h1.5m-1.5 3.75h1.5M9 3.75h1.5m3 0h1.5" /></svg>;
+const ClientsIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.512 2.72a3 3 0 01-4.682-2.72 9.094 9.094 0 013.741-.479m7.512 2.72a8.97 8.97 0 01-3.741-.479m3.741.479a8.97 8.97 0 00-3.741-.479m-7.512 2.72a9.094 9.094 0 01-3.741-.479m5.408 1.903c.128.02.257.04.386.06m-7.512-2.72a3 3 0 00-4.682-2.72 9.094 9.094 0 003.741.479m9.873-1.534a9.094 9.094 0 00-3.741-.479m-9.873 1.534a9.094 9.094 0 01-3.741-.479m14.513 1.534c.128.02.257.04.386.06m-4.682-2.72a3 3 0 014.682-2.72" /></svg>;
+const DealsIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>;
+const CRMIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" /></svg>;
+const TeamIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.512 2.72a3 3 0 01-4.682-2.72 9.094 9.094 0 013.741-.479m7.512 2.72a8.97 8.97 0 01-3.741-.479m3.741.479a8.97 8.97 0 00-3.741-.479m-7.512 2.72a9.094 9.094 0 01-3.741-.479m5.408 1.903a9.094 9.094 0 01-3.741-.479M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>;
+const ChartBarIcon: React.FC<React.ComponentProps<'svg'>> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>;
 
-const CRMIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-)
-
-
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, setIsOpen }) => {
   return (
-    <nav className="w-64 bg-gray-800 p-4 border-r border-gray-700 flex flex-col">
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-white">CRM Menu</h2>
-      </div>
-      <ul className="space-y-3">
-        <NavItem label="Tasks" view="tasks" activeView={activeView} onClick={setActiveView} icon={<BoardIcon />} />
-        <NavItem label="CRM" view="crm" activeView={activeView} onClick={setActiveView} icon={<CRMIcon />} />
-        <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={setActiveView} icon={<BusinessIcon />}/>
-        <NavItem label="Clients" view="clients" activeView={activeView} onClick={setActiveView} icon={<ClientsIcon />} />
-        <NavItem label="Deals" view="deals" activeView={activeView} onClick={setActiveView} icon={<DealsIcon />} />
-      </ul>
-      <div className="mt-auto text-center text-gray-500 text-xs">
-          <p>Powered by Gemini</p>
-      </div>
-    </nav>
+    <>
+        {/* Mobile menu overlay */}
+        <div 
+            className={`fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity lg:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            onClick={() => setIsOpen(false)}
+        ></div>
+
+        {/* Sidebar */}
+        <nav className={`fixed top-0 left-0 h-full w-64 bg-white p-4 border-r border-brevo-border flex flex-col z-40 transform transition-transform lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="mb-8">
+            <h2 className="text-2xl font-bold text-brevo-cta">olooAI</h2>
+        </div>
+        <ul className="space-y-1">
+            <NavItem label="Homepage" view="homepage" activeView={activeView} onClick={setActiveView} icon={<HomeIcon />} />
+            <NavItem label="CRM" view="crm" activeView={activeView} onClick={setActiveView} icon={<CRMIcon />} />
+            <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={setActiveView} icon={<BusinessIcon />}/>
+            <NavItem label="Clients" view="clients" activeView={activeView} onClick={setActiveView} icon={<ClientsIcon />} />
+            <NavItem label="Deals" view="deals" activeView={activeView} onClick={setActiveView} icon={<DealsIcon />} />
+        </ul>
+        <div className="mt-auto">
+            <ul className="space-y-1 pt-4 border-t border-brevo-border">
+                <NavItem label="Team & Access" view="team" activeView={activeView} onClick={setActiveView} icon={<TeamIcon />} />
+                <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={setActiveView} icon={<ChartBarIcon />} />
+            </ul>
+            <div className="mt-8 text-center text-brevo-text-secondary text-xs">
+                <p>Powered by Gemini</p>
+            </div>
+        </div>
+        </nav>
+    </>
   );
 };
 
