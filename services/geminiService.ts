@@ -1,15 +1,8 @@
 
 
-import { GoogleGenAI } from "@google/genai";
+
 import { GeminiBlob, GeminiFunctionDeclaration, GeminiModality, GeminiType } from '../types';
-
-// This is the correct way to access environment variables in this app.
-if (!process.env.API_KEY) {
-    console.error("API_KEY environment variable is not set. The app will display a configuration error message.");
-}
-
-// Initialize the AI with the key from the environment variables.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+import { getAiInstance } from '../config/geminiConfig';
 
 // --- Audio Utility Functions ---
 
@@ -249,6 +242,7 @@ interface LiveSessionCallbacks {
 }
 
 export function connectToLiveSession(callbacks: LiveSessionCallbacks, systemInstruction: string, useTools: boolean = true) {
+    const ai = getAiInstance();
     const config: any = {
         responseModalities: [GeminiModality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },

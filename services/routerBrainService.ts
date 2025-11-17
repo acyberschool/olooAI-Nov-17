@@ -1,7 +1,8 @@
 
 
-import { GoogleGenAI } from '@google/genai';
+
 import { RouterBrainResult, GeminiType } from '../types';
+import { getAiInstance } from '../config/geminiConfig';
 
 const getSystemPrompt = (knownData: { clients: string[], deals: string[], businessLines: string[] }, context: any, platform_activity_summary: string) => `
 You are the "router brain" for olooAI. Your primary function is to meticulously analyze an incoming message (from email, Telegram, or typed text) and translate it into structured data with high fidelity to the user's intent. Your goal is to be a precise interpreter, not an imaginative assistant.
@@ -113,8 +114,7 @@ const routerBrainSchema = {
 };
 
 export const processTextMessage = async (text: string, knownData: any, context: any, platformActivitySummary: string): Promise<RouterBrainResult> => {
-    if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = getAiInstance();
     const systemInstruction = getSystemPrompt(knownData, context, platformActivitySummary);
     
     try {

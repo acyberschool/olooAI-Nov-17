@@ -1,5 +1,8 @@
 
 
+import type { FunctionDeclaration, Schema, Blob } from '@google/genai';
+import { Type, Modality } from '@google/genai';
+
 export enum KanbanStatus {
   ToDo = 'To Do',
   Doing = 'Doing',
@@ -191,43 +194,11 @@ export interface RouterBrainResult {
 }
 
 
-// --- Local Gemini Types to avoid import issues ---
-
-export enum GeminiType {
-  STRING = 'STRING',
-  NUMBER = 'NUMBER',
-  INTEGER = 'INTEGER',
-  BOOLEAN = 'BOOLEAN',
-  ARRAY = 'ARRAY',
-  OBJECT = 'OBJECT',
-}
-
-export interface GeminiSchema {
-    type: GeminiType;
-    description?: string;
-    format?: string;
-    nullable?: boolean;
-    enum?: string[];
-    items?: GeminiSchema;
-    properties?: { [key: string]: GeminiSchema };
-    required?: string[];
-    propertyOrdering?: string[];
-}
-
-export interface GeminiFunctionDeclaration {
-  name: string;
-  description?: string;
-  parameters?: GeminiSchema;
-}
-
-export interface GeminiBlob {
-  data: string; // base64 encoded string
-  mimeType: string;
-}
-
-export enum GeminiModality {
-    MODALITY_UNSPECIFIED = 'MODALITY_UNSPECIFIED',
-    TEXT = 'TEXT',
-    IMAGE = 'IMAGE',
-    AUDIO = 'AUDIO',
-}
+// --- Gemini Types from @google/genai ---
+// FIX: Replaced local type definitions with aliases to the official @google/genai types
+// to ensure consistency and adherence to coding guidelines.
+export { Type as GeminiType };
+export type { Schema as GeminiSchema };
+export type { FunctionDeclaration as GeminiFunctionDeclaration };
+export type { Blob as GeminiBlob };
+export { Modality as GeminiModality };

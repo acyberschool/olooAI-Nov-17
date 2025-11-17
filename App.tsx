@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import VoiceControl from './components/VoiceControl';
 import ChatInterface from './components/ChatInterface';
@@ -20,18 +19,20 @@ import TeamView from './components/TeamView';
 import UniversalInputModal from './components/UniversalInputModal';
 import DataInsightsView from './components/DataInsightsView';
 import SettingsView from './components/SettingsView';
+import { getApiKey } from './config/geminiConfig';
 
+// --- Check for API Key at the module level before the app renders ---
+let isApiKeyAvailable = true;
+try {
+  getApiKey();
+} catch (e) {
+  isApiKeyAvailable = false;
+}
 
 // --- Google Analytics Helper ---
 declare global {
     interface Window {
         gtag: (...args: any[]) => void;
-    }
-    // This will be populated by the environment
-    namespace NodeJS {
-        interface ProcessEnv {
-            API_KEY: string;
-        }
     }
 }
 export const trackEvent = (action: string, category: string, label: string, value?: number) => {
@@ -88,7 +89,10 @@ const ApiKeyMissingError = () => (
 
 
 export default function App() {
-  const [apiKeyMissing, setApiKeyMissing] = useState(false);
+  if (!isApiKeyAvailable) {
+    return <ApiKeyMissingError />;
+  }
+  
   const [activeView, setActiveView] = useState<View>('homepage');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedBusinessLineId, setSelectedBusinessLineId] = useState<string | null>(null);
@@ -101,14 +105,6 @@ export default function App() {
 
   const [isUniversalInputOpen, setIsUniversalInputOpen] = useState(false);
   const [universalInputContext, setUniversalInputContext] = useState<UniversalInputContext>({});
-
-  useEffect(() => {
-    // A missing API key is a critical error, especially on deployment.
-    // This prevents a blank screen and shows a helpful error message.
-    if (!process.env.API_KEY) {
-      setApiKeyMissing(true);
-    }
-  }, []);
 
   const handleTurnComplete = (user: string, assistant: string) => {
     if (user || assistant) {
@@ -311,10 +307,6 @@ export default function App() {
           />;
     }
   };
-
-  if (apiKeyMissing) {
-    return <ApiKeyMissingError />;
-  }
 
   return (
     <div className="min-h-screen font-sans flex flex-col lg:flex-row bg-brevo-light-gray">

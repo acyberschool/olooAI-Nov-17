@@ -1,9 +1,10 @@
 
 
+
 import { useState, useCallback } from 'react';
 import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, PlatformInsight, FilterOptions, GeminiType } from '../types';
 import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries } from '../data/mockData';
-import { GoogleGenAI } from '@google/genai';
+import { getAiInstance } from '../config/geminiConfig';
 import { processTextMessage } from '../services/routerBrainService';
 import { trackEvent } from '../App';
 
@@ -52,8 +53,7 @@ export const useKanban = () => {
 
   const _generateAndSetSubtasks = async (taskId: string, taskTitle: string) => {
       try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = `Break down the following task into a simple checklist of 3-5 sub-tasks. Return ONLY a valid JSON array of strings. For example: ["Sub-task 1", "Sub-task 2"].\n\nTask: "${taskTitle}"`;
         const response = await ai.models.generateContent({ 
             model: 'gemini-2.5-flash', 
@@ -127,8 +127,7 @@ export const useKanban = () => {
 
   const generateAndAddPlaybook = useCallback(async (businessLine: BusinessLine) => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = `Based on the following business line, generate a standard playbook with 5-7 simple steps from initial contact to a completed job. Return ONLY a valid JSON array of objects, where each object has a "title" and a "description". For example: [{"title": "Step 1", "description": "Details for step 1"}].\n\nName: ${businessLine.name}\nDescription: ${businessLine.description}\nCustomers: ${businessLine.customers}`;
         
         const response = await ai.models.generateContent({
@@ -325,8 +324,7 @@ export const useKanban = () => {
     }
 
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const client = clients.find(c => c.id === task.clientId);
         const lastCRMEntry = crmEntries.filter(c => c.clientId === task.clientId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
         const dealDocuments = documents.filter(doc => doc.ownerId === deal?.id).map(d => d.name).join(', ');
@@ -458,8 +456,7 @@ export const useKanban = () => {
   
   const getOpportunities = useCallback(async (businessLine: BusinessLine, expand: boolean = false): Promise<{ opportunities: Opportunity[], sources: any[] }> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = `You are a top-tier business strategist. Analyze the following business line, perform a deep web search for market trends and news, and generate 3 highly specific and creative business opportunities. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
 Example: ["Partner with local real estate agencies for a 'new tenant welcome package', as recent articles show a boom in rental property occupancy."]
 
@@ -493,9 +490,8 @@ AI Focus: ${businessLine.aiFocus}`;
   
   const getClientOpportunities = useCallback(async (client: Client, expand: boolean = false): Promise<{ opportunities: Opportunity[], sources: any[] }> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const businessLine = businessLines.find(bl => bl.id === client.businessLineId);
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = `You are a top-tier business strategist. Analyze the following client, perform a deep web search for news and trends related to them, and generate 3 simple, actionable opportunities to grow the business relationship. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
 Client Name: ${client.name}
 Description: ${client.description}
@@ -524,10 +520,9 @@ AI Focus: ${client.aiFocus}`;
   
   const getDealOpportunities = useCallback(async (deal: Deal, expand: boolean = false): Promise<{ opportunities: Opportunity[], sources: any[] }> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
         const client = clients.find(c => c.id === deal.clientId);
         const businessLine = businessLines.find(bl => bl.id === deal.businessLineId);
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = `You are a top-tier business strategist. Based on the following deal, perform a deep web search for industry trends, and generate 3 simple, actionable next steps or upsell opportunities. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
 Deal Name: ${deal.name}
 Description: ${deal.description}
@@ -559,8 +554,7 @@ Business Line: ${businessLine?.name}`;
 
   const generateDocumentDraft = useCallback(async (prompt: string, category: DocumentCategory, owner: BusinessLine | Client | Deal, ownerType: DocumentOwnerType): Promise<string> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const fullPrompt = `You are an expert business document writer. Generate a professional draft for a "${category}" document for a ${ownerType} named "${owner.name}". The user's request is: "${prompt}". Provide only the draft text, without any introductory phrases like "Here is the draft:".`;
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: fullPrompt });
         return response.text.trim();
@@ -572,8 +566,7 @@ Business Line: ${businessLine?.name}`;
 
   const generateMarketingCollateralPrompt = useCallback(async (prompt: string, collateralType: string, owner: BusinessLine | Client | Deal): Promise<string> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const fullPrompt = `You are an expert marketing assistant. Generate a creative prompt for a "${collateralType}" about "${owner.name}". The user's goal is: "${prompt}". The prompt should be something they can copy and paste into another AI tool (like an image generator or video creator). Provide only the creative prompt itself, without any introductory phrases. Make it descriptive and inspiring.`;
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: fullPrompt });
         return response.text.trim();
@@ -614,8 +607,7 @@ Business Line: ${businessLine?.name}`;
 
   const findProspects = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<{ prospects: Prospect[], sources: any[] }> => {
     try {
-      if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = getAiInstance();
       const prompt = customPrompt || `You are a business development expert. Based on my business line "${businessLine.name}" (${businessLine.description}), perform a deep web search to find 5 potential new clients. For each, provide a name and a likely need, explaining your reasoning. Return ONLY a valid JSON array of objects, where each object has "name" and "likelyNeed".`;
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
@@ -669,8 +661,7 @@ Business Line: ${businessLine?.name}`;
 
   const generateSocialMediaIdeas = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<string[]> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = customPrompt || `Based on my business line "${businessLine.name}" and recent online trends, generate 5 timely social media post ideas. State that this is based on your knowledge and external research. Return ONLY a valid JSON array of strings.`;
         const response = await ai.models.generateContent({ 
             model: 'gemini-2.5-flash', 
@@ -765,8 +756,7 @@ Business Line: ${businessLine?.name}`;
 
   const getClientPulse = useCallback(async (client: Client, filters: FilterOptions, customPrompt?: string): Promise<ClientPulse[]> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = customPrompt || `Based on external research, find recent public social media posts or news articles mentioning "${client.name}". Apply the following filters: ${JSON.stringify(filters)}. For each result, provide the source, content snippet, a URL, and a date. Return ONLY a valid JSON array of objects with keys: "source", "content", "url", "date".`;
         const response = await ai.models.generateContent({ 
             model: 'gemini-2.5-flash', 
@@ -799,8 +789,7 @@ Business Line: ${businessLine?.name}`;
 
   const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: FilterOptions, customPrompt?: string): Promise<{ insights: CompetitorInsight[], trends: SearchTrend[] }> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = customPrompt || `For a business in "${businessLine.name}", perform a deep search online. Apply these filters: ${JSON.stringify(filters)}.
         1. Identify 2-3 key competitors and provide a recent insight for each.
         2. Identify 2-3 recent customer search trends related to this business.
@@ -855,8 +844,7 @@ Business Line: ${businessLine?.name}`;
 
   const generateDocumentFromSubtask = useCallback(async (task: Task, subtaskText: string): Promise<Document | null> => {
     try {
-        if (!process.env.API_KEY) throw new Error("API Key is not configured.");
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = getAiInstance();
         const prompt = `Based on the task "${task.title}", generate the content for the following sub-task: "${subtaskText}". Return only the document content.`;
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
         const content = response.text.trim();
