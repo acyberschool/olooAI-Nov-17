@@ -58,10 +58,10 @@ const ApiKeyMissingError = () => (
         <div className="max-w-2xl text-center bg-white p-8 rounded-xl shadow-2xl border border-red-200">
             <h1 className="text-3xl font-bold mb-4 text-red-900">Configuration Error</h1>
             <p className="text-lg mb-2 text-red-700">
-                The application cannot start because the <strong>API_KEY</strong> is missing.
+                The application cannot start because the <strong>VITE_API_KEY</strong> is missing.
             </p>
             <p className="mb-6 text-red-600">
-                To fix this, you need to set the `API_KEY` environment variable in your deployment service (e.g., Vercel, Netlify).
+                To fix this, you need to set the `VITE_API_KEY` environment variable in your deployment service (e.g., Vercel, Netlify).
             </p>
             <div className="bg-red-50 p-4 rounded-lg text-left text-sm font-mono text-red-900">
                 <p className="font-semibold">Example Steps for Vercel:</p>
@@ -69,7 +69,7 @@ const ApiKeyMissingError = () => (
                     <li>Go to your project's dashboard on Vercel.</li>
                     <li>Navigate to the <strong>Settings</strong> tab.</li>
                     <li>Click on <strong>Environment Variables</strong> in the side menu.</li>
-                    <li>Add a new variable with the name <strong>API_KEY</strong> and paste your key in the value field.</li>
+                    <li>Add a new variable with the name <strong>VITE_API_KEY</strong> and paste your key in the value field.</li>
                     <li>Redeploy your application for the changes to take effect.</li>
                 </ol>
             </div>
@@ -99,7 +99,7 @@ export default function App() {
   useEffect(() => {
     // A missing API key is a critical error, especially on deployment.
     // This prevents a blank screen and shows a helpful error message.
-    if (!process.env.API_KEY) {
+    if (!process.env.VITE_API_KEY) {
       setApiKeyMissing(true);
     }
   }, []);
