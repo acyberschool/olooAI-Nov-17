@@ -3,11 +3,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { GeminiBlob, GeminiFunctionDeclaration, GeminiModality, GeminiType } from '../types';
 
-if (!process.env.VITE_API_KEY) {
-    console.error("VITE_API_KEY environment variable is not set. The app will display a configuration error message.");
+// FIX: Use process.env.API_KEY as per guidelines to resolve TypeScript error.
+if (!process.env.API_KEY) {
+    // FIX: Updated error message to reflect the correct environment variable.
+    console.error("API_KEY environment variable is not set. The app will display a configuration error message.");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY || "" });
+// FIX: Use process.env.API_KEY as per guidelines to resolve TypeScript error.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
 // --- Audio Utility Functions ---
 
