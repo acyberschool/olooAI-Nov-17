@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { UniversalInputContext } from '../App';
 import { useDictation } from '../hooks/useDictation';
@@ -35,13 +33,15 @@ const UniversalInputModal: React.FC<UniversalInputModalProps> = ({ isOpen, onClo
   }, [isOpen]);
 
   useEffect(() => {
-    // This is the new immediate-action flow.
-    // When a final transcript is received from dictation, we save and close.
-    if (dictation.transcript) {
+    // When a final transcript is received (i.e., not null), save and close.
+    // This makes voice input instant and handles manual stops correctly.
+    if (dictation.transcript !== null) {
+      if (dictation.transcript.trim()) {
         onSave(dictation.transcript);
-        onClose();
+      }
+      onClose();
     }
-  }, [dictation.transcript, onSave, onClose])
+  }, [dictation.transcript, onSave, onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

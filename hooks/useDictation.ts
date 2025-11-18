@@ -1,5 +1,3 @@
-
-
 import { useState, useRef, useCallback } from 'react';
 import { connectToLiveSession, createPcmBlob } from '../services/geminiService';
 
@@ -7,7 +5,7 @@ type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
 export const useDictation = () => {
   const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState<string | null>(null);
 
   const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -33,19 +31,26 @@ export const useDictation = () => {
     }
   }, []);
 
+  const stopDictation = useCallback(() => {
+    if (!isRecording) return;
+    setIsRecording(false);
+    setTranscript(accumulatedTranscriptRef.current);
+    cleanup();
+  }, [isRecording, cleanup]);
+
+
   const handleMessage = async (message: any) => {
     if (message.serverContent?.inputTranscription) {
         accumulatedTranscriptRef.current += (message.serverContent.inputTranscription.text || '');
     }
     if (message.serverContent?.turnComplete) {
-        setTranscript(accumulatedTranscriptRef.current);
         stopDictation();
     }
   };
   
   const startDictation = async () => {
     if (isRecording) return;
-    setTranscript('');
+    setTranscript(null);
     accumulatedTranscriptRef.current = '';
     
     try {
@@ -84,12 +89,6 @@ export const useDictation = () => {
     }
   };
 
-  const stopDictation = useCallback(() => {
-    if (!isRecording) return;
-    setIsRecording(false);
-    cleanup();
-  }, [isRecording, cleanup]);
-  
   return {
     isRecording,
     transcript,

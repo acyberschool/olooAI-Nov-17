@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Copy of Voice First Kanban Copilot",
+  "name": "OlooAI V1.2",
   "description": "A SaaS web app where users talk to the system to manage all their work. Voice notes are transcribed, understood by AI, and converted into structured task cards on a Kanban board.",
   "requestFramePermissions": [
     "microphone"

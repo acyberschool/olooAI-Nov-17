@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import VoiceControl from './components/VoiceControl';
 import ChatInterface from './components/ChatInterface';
@@ -20,6 +21,13 @@ import DataInsightsView from './components/DataInsightsView';
 import SettingsView from './components/SettingsView';
 import { getApiKey } from './config/geminiConfig';
 
+// --- Check for API Key at the module level before the app renders ---
+let isApiKeyAvailable = true;
+try {
+  getApiKey();
+} catch (e) {
+  isApiKeyAvailable = false;
+}
 
 // --- Google Analytics Helper ---
 declare global {
@@ -73,30 +81,16 @@ const ApiKeyMissingError = () => (
                 </ol>
             </div>
             <p className="mt-6 text-sm text-red-600">
-                If you don't have a key, you can get one from <a href="https://makersuite.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold hover:text-red-8[...]\n            </p>
+                If you don't have a key, you can get one from <a href="https://makersuite.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold hover:text-red-800">Google AI Studio</a>.
+            </p>
         </div>
     </div>
 );
 
-export default function App() {
-  const [isApiKeyAvailable, setIsApiKeyAvailable] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    try {
-      // getApiKey will check VITE_API_KEY (client) or API_KEY (server) depending on environment.
-      getApiKey();
-      setIsApiKeyAvailable(true);
-    } catch (e) {
-      setIsApiKeyAvailable(false);
-      console.error('API key check failed:', (e as Error).message);
-    }
-  }, []);
-  
-  if (isApiKeyAvailable === false) {
+export default function App() {
+  if (!isApiKeyAvailable) {
     return <ApiKeyMissingError />;
-  }
-  if (isApiKeyAvailable === null) {
-    return <div className="min-h-screen flex items-center justify-center">Checking configuration…</div>;
   }
   
   const [activeView, setActiveView] = useState<View>('homepage');
@@ -226,7 +220,7 @@ export default function App() {
                 businessLines={kanban.businessLines}
                 tasks={kanban.tasks.filter(t => t.clientId === selectedClientId)}
                 deals={kanban.deals.filter(d => d.clientId === selectedClientId)}
-                documents={kanban.documents.filter(doc => doc.ownerId === selectedClientId && doc.ownerType === 'client')}
+                documents={kanban.documents.filter(doc => doc.ownerId === selectedClientId && doc.ownerType === 'client' || kanban.crmEntries.filter(c => c.clientId === client.id).map(c=>c.documentId).includes(doc.id))}
                 crmEntries={kanban.crmEntries.filter(c => c.clientId === selectedClientId)}
                 kanbanApi={kanban}
                 onSelectBusinessLine={handleSelectBusinessLine}

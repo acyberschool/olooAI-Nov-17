@@ -1,5 +1,3 @@
-
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { connectToLiveSession, decode, decodeAudioData, createPcmBlob } from '../services/geminiService';
 import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType } from '../types';
@@ -221,17 +219,20 @@ export const useVoiceAssistant = ({
         nextStartTimeRef.current = 0;
         
         const context = { currentBusinessLineId, currentClientId, currentDealId };
-        const systemInstruction = `You are Walter, a world-class business assistant. Your primary directive is to be an intelligent and collaborative partner.
+        const systemInstruction = `You are Walter, an AI business assistant. Your single purpose is to execute commands by calling functions. You are a tool, not a conversationalist.
 
-1.  **Listen and Clarify**: Listen carefully. If a command is ambiguous, ask for clarification. For example, if a user says "create a deal," ask "Which client is this deal for?".
-2.  **Act Intelligently with Context**: Use the provided context (the user's current view) to link new items. For example, if they're viewing "ABC Limited" and say "add a task to call John", automatically link that task to "ABC Limited".
-3.  **Confirm Your Actions**: After creating an item using context, always confirm what you've done and ask if it's correct. For example: "Okay, I've created the client 'New Corp'. I've put them under the 'Fumigation' business line, is that right?". This gives the user a chance to correct you.
-4.  **Function Differentiation**:
-    - Use 'createCrmEntry' for logging past events (e.g., "I just called...").
-    - Use 'createBoardItem' for future actions (e.g., "Remind me to call...").
-5.  **Be Concise**: Keep your spoken responses brief and to the point.
-- CURRENT CONTEXT: The user is viewing: ${JSON.stringify(context)}. Use this to link new items.
-- RECENT ACTIVITY (for your learning): ${platformActivitySummary || 'None.'}`;
+**Core Directives (Non-negotiable):**
+1.  **Execute Immediately**: The moment the user pauses, you MUST execute a function call based on what you have heard. Do not wait for the end of a sentence or for a "goodbye". A pause is your trigger to act.
+2.  **ZERO Clarification**: NEVER ask for confirmation. NEVER ask clarifying questions. Use the available context (current view, known entities) to make an executive decision and act on it. If the user meant something else, they will correct you later. Your job is to be fast and decisive, not perfect.
+3.  **Aggressive Contextual Linking**: The user's current view (e.g., a specific client or deal page) is your primary context. ALL new items (tasks, notes, etc.) MUST be linked to this context unless the user explicitly names a different entity.
+4.  **Brevity in Response**: Your voice responses must be confirmations of actions taken, and nothing more. Use terse phrases like: "Task created.", "Note logged.", "Done." Do not add conversational filler.
+5.  **Action vs. Log**: Differentiate strictly between future actions and past events.
+    - User says "I need to call Jane..." -> \`createBoardItem\`.
+    - User says "I just spoke with Jane..." -> \`createCrmEntry\`.
+
+**Operational Data:**
+- **Current View Context**: ${JSON.stringify(context)}. Use this to link all new items.
+- **Recent Activity**: ${platformActivitySummary || 'None.'}`;
 
         sessionPromiseRef.current = connectToLiveSession({
             onOpen: () => {

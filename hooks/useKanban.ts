@@ -1,6 +1,3 @@
-
-
-
 import { useState, useCallback } from 'react';
 import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, PlatformInsight, FilterOptions, GeminiType } from '../types';
 import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries } from '../data/mockData';
@@ -51,10 +48,32 @@ export const useKanban = () => {
      trackEvent('create', 'CRM Entry', entryData.type);
   };
 
-  const _generateAndSetSubtasks = async (taskId: string, taskTitle: string) => {
+  const _generateAndSetSubtasks = async (task: Task, context: { client?: Client, deal?: Deal, businessLine?: BusinessLine }) => {
       try {
         const ai = getAiInstance();
-        const prompt = `Break down the following task into a simple checklist of 3-5 sub-tasks. Return ONLY a valid JSON array of strings. For example: ["Sub-task 1", "Sub-task 2"].\n\nTask: "${taskTitle}"`;
+        const { client, deal, businessLine } = context;
+
+        const prompt = `You are an expert project manager AI. A new task has been created within a specific business context. Your job is to deconstruct this primary task into a checklist of 3-5 highly relevant, actionable sub-tasks that represent a logical workflow sequence. Your output must be a valid JSON array of strings. Do not add any other text.
+
+**CRITICAL CONTEXT - USE ALL OF THIS:**
+- **Business Line:** ${businessLine ? `${businessLine.name}. What we do: ${businessLine.description}. Our typical customers: ${businessLine.customers}.` : 'Not specified.'}
+- **Client:** ${client ? `${client.name}. About them: ${client.description}. Our AI focus with them: ${client.aiFocus}.` : 'Not specified.'}
+- **Deal:** ${deal ? `${deal.name}. Deal objective: ${deal.description}. Deal value: ${deal.currency} ${deal.value}.` : 'Not specified.'}
+- **Primary Task to Deconstruct:** "${task.title}"
+${task.description ? `- Task Details: "${task.description}"` : ''}
+
+**Your Mandate:**
+1.  **Analyze the Goal:** Deeply understand the primary task's objective within the provided business context.
+2.  **Create a Workflow:** The sub-tasks must be sequential steps. The first sub-task should be the logical starting point, and the last should lead to the completion of the primary task.
+3.  **Be Specific and Actionable:** Avoid vague sub-tasks. Instead of "Get details", use "Email John Doe to confirm warehouse dimensions".
+4.  **Be Decisive:** The user can edit or delete these later. Provide a complete, ready-to-use checklist.
+
+**Example of High-Quality Output:**
+For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good output is:
+["Review notes from the last call with ABC's facility manager", "Confirm service scope for all three warehouse locations", "Draft the contract using the standard legal template", "Calculate final pricing including the new basement area", "Send the draft contract to Grandma Oloo for final review before sending to client"]
+
+**Your Output (JSON array of strings only):**`;
+        
         const response = await ai.models.generateContent({ 
             model: 'gemini-2.5-flash', 
             contents: prompt,
@@ -70,13 +89,13 @@ export const useKanban = () => {
         const subTaskTexts: string[] = JSON.parse(jsonString);
         
         const subTasks = subTaskTexts.map((text, index) => ({
-            id: `sub-${taskId}-${index}`,
+            id: `sub-${task.id}-${index}`,
             text,
             isDone: false,
         }));
 
-        setTasks(prev => prev.map(task => 
-            task.id === taskId ? { ...task, subTasks } : task
+        setTasks(prev => prev.map(t => 
+            t.id === task.id ? { ...t, subTasks } : t
         ));
       } catch (e) {
           console.error("Error generating sub-tasks:", e);
@@ -96,6 +115,13 @@ export const useKanban = () => {
         if (client) businessLineId = client.businessLineId;
     }
 
+    const client = clients.find(c => c.id === itemData.clientId);
+    const deal = deals.find(d => d.id === itemData.dealId);
+    let businessLine = businessLines.find(bl => bl.id === businessLineId);
+    if (!businessLine && client) {
+        businessLine = businessLines.find(bl => bl.id === client.businessLineId);
+    }
+
     const newTask: Task = {
       id: `task-${Date.now()}`,
       title: itemData.title,
@@ -109,7 +135,7 @@ export const useKanban = () => {
 
     setTasks((prevTasks) => [newTask, ...prevTasks]);
     
-    _generateAndSetSubtasks(newTask.id, newTask.title);
+    _generateAndSetSubtasks(newTask, { client, deal, businessLine });
     
     if (newTask.clientId) {
       _addCRMEntryToState({
@@ -123,7 +149,7 @@ export const useKanban = () => {
     }
     trackEvent('create', 'Task', newTask.type);
     return `${newTask.type} "${newTask.title}" created successfully.`;
-  }, [businessLines, clients]);
+  }, [businessLines, clients, deals]);
 
   const generateAndAddPlaybook = useCallback(async (businessLine: BusinessLine) => {
     try {
