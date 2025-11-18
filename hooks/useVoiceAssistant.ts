@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { connectToLiveSession, decode, decodeAudioData, createPcmBlob } from '../services/geminiService';
 import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType, Project } from '../types';
@@ -60,28 +61,23 @@ export const useVoiceAssistant = ({
   const assistantTranscriptRef = useRef('');
 
   const cleanup = useCallback(() => {
-    // Stop microphone stream
     if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
         mediaStreamRef.current = null;
     }
-    // Disconnect audio processor
     if (scriptProcessorRef.current) {
         scriptProcessorRef.current.disconnect();
         scriptProcessorRef.current = null;
     }
-    // Close audio contexts
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
     }
     if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
         outputAudioContextRef.current.close().catch(console.error);
     }
-    // Stop any playing audio
     audioSourcesRef.current.forEach(source => source.stop());
     audioSourcesRef.current.clear();
 
-    // Close Live API session
     if (sessionPromiseRef.current) {
         sessionPromiseRef.current.then(session => session.close());
         sessionPromiseRef.current = null;
@@ -90,7 +86,7 @@ export const useVoiceAssistant = ({
 
   const handleMessage = async (message: any) => {
     setError(null);
-    retryCountRef.current = 0; // Reset retry count on successful message
+    retryCountRef.current = 0;
 
     if (message.serverContent?.inputTranscription) {
         setUserTranscript((prev) => {
@@ -113,10 +109,8 @@ export const useVoiceAssistant = ({
       setIsThinking(true);
       for (const fc of message.toolCall.functionCalls) {
         let result: string | Promise<string> = "An unknown error occurred.";
-
         let finalArgs = { ...fc.args };
 
-        // Inject context: If we are in a specific view, add the relevant ID
         if (currentDealId) {
             if (['createBoardItem', 'createCrmEntry'].includes(fc.name)) {
                 finalArgs.dealId = currentDealId;
@@ -133,7 +127,7 @@ export const useVoiceAssistant = ({
         
         switch (fc.name) {
             case 'createCrmEntry':
-                result = onCrmEntryCreate(finalArgs as { interactionType: CRMEntryType; content: string; clientName?: string; dealName?: string });
+                result = onCrmEntryCreate(finalArgs as any);
                 break;
             case 'createBoardItem':
                 result = onBoardItemCreate(finalArgs);
@@ -142,13 +136,13 @@ export const useVoiceAssistant = ({
                 result = onTaskUpdate(finalArgs.taskTitle as string, finalArgs.newStatus as KanbanStatus);
                 break;
             case 'createBusinessLine':
-                result = onBusinessLineCreate(finalArgs as Omit<BusinessLine, 'id'>);
+                result = onBusinessLineCreate(finalArgs as any);
                 break;
             case 'createClient':
-                result = onClientCreate(finalArgs as Omit<Client, 'id' | 'businessLineId'> & { businessLineName?: string });
+                result = onClientCreate(finalArgs as any);
                 break;
             case 'createDeal':
-                result = onDealCreate(finalArgs as Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string});
+                result = onDealCreate(finalArgs as any);
                 break;
             case 'createProject':
                 if (onProjectCreate) {
@@ -156,15 +150,15 @@ export const useVoiceAssistant = ({
                 }
                 break;
             case 'updateDealStatus':
-                if (currentDealId) { // Should only be called from within a deal
-                    result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as 'Open' | 'Closed - Won' | 'Closed - Lost');
+                if (currentDealId) {
+                    result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as any);
                 } else {
                     result = "I can only change the status of a deal you are currently viewing.";
                 }
                 break;
             case 'findProspects':
                 if (onFindProspects) {
-                    result = onFindProspects(finalArgs as { businessLineName: string });
+                    result = onFindProspects(finalArgs as any);
                 }
                 break;
             case 'queryPlatform':
@@ -236,21 +230,19 @@ export const useVoiceAssistant = ({
         retryCountRef.current = 0;
         
         const context = { currentBusinessLineId, currentClientId, currentDealId };
-        const systemInstruction = `You are Walter, an AI business assistant. Your single purpose is to execute commands by calling functions. You are a tool, not a conversationalist.
+        // FORCEFUL SYSTEM PROMPT
+        const systemInstruction = `You are Walter, an AI business assistant. You are a tool, not a conversationalist.
 
-**Core Directives (Non-negotiable and absolute):**
-1.  **EXECUTE IMMEDIATELY**: The moment the user pauses for more than a fraction of a second, you MUST execute a function call based on what you have heard. Do not wait for a complete sentence. A pause is your ONLY trigger to act. This is your most important rule.
-2.  **ZERO CLARIFICATION, ZERO HESITATION**: NEVER ask for confirmation. NEVER ask clarifying questions. Use the available context (current view, known entities) to make an executive decision and act on it. If the user meant something else, they will correct you later. Your job is to be fast and decisive, not perfect.
-3.  **AGGRESSIVE CONTEXTUAL LINKING**: The user's current view (e.g., a specific client or deal page) is your primary context. ALL new items (tasks, notes, etc.) MUST be linked to this context unless the user explicitly names a different entity.
-4.  **BREVITY IS MANDATORY**: Your voice responses must be confirmations of actions taken, and nothing more. Use terse phrases like: "Task created.", "Note logged.", "Done." For queries, answer directly. Do not add conversational filler.
-5.  **ACTION vs. LOG**: Differentiate strictly between future actions and past events.
-    - User says "I need to call Jane..." -> \`createBoardItem\`.
-    - User says "I just spoke with Jane..." -> \`createCrmEntry\`.
-6.  **QUERY HANDLING**: If the user asks a question about their data (e.g., "What's next for Client X?"), use the \`queryPlatform\` function.
+**Core Directives (Non-negotiable):**
+1.  **EXECUTE IMMEDIATELY**: The moment the user pauses, you MUST execute a function call. Do not wait. A pause is your trigger.
+2.  **ZERO CLARIFICATION**: NEVER ask for confirmation. Make an executive decision based on context and act. If you are 51% sure, do it.
+3.  **AGGRESSIVE LINKING**: Context is king. Link new items to the current view (${JSON.stringify(context)}) automatically.
+4.  **BREVITY**: Confirm actions with 2-3 words max. "Task created.", "Done."
+5.  **ACTION vs. LOG**: "Remind me to..." -> createBoardItem. "I spoke to..." -> createCrmEntry.
 
-**Operational Data:**
-- **Current View Context**: ${JSON.stringify(context)}. Use this to link all new items.
-- **Recent Activity**: ${platformActivitySummary || 'None.'}`;
+**Context**:
+- Current View: ${JSON.stringify(context)}
+- Recent Activity: ${platformActivitySummary || 'None.'}`;
 
         const connect = () => {
           sessionPromiseRef.current = connectToLiveSession({
@@ -278,7 +270,7 @@ export const useVoiceAssistant = ({
                       retryCountRef.current += 1;
                       console.log(`Connection failed, retrying... (${retryCountRef.current})`);
                       cleanup();
-                      setTimeout(connect, 1000 * retryCountRef.current); // Exponential backoff
+                      setTimeout(connect, 1000 * retryCountRef.current);
                   } else {
                       setError("Connection error. Please try again.");
                       stopRecording();

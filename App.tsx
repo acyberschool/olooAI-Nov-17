@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import VoiceControl from './components/VoiceControl';
 import ChatInterface from './components/ChatInterface';
@@ -269,6 +268,7 @@ export default function App() {
                 onSelectClient={handleSelectClient}
                 onSelectBusinessLine={handleSelectBusinessLine}
                 onSelectTask={handleSelectTask}
+                clients={kanban.clients}
                 onBack={() => {
                     const client = kanban.clients.find(c => c.id === deal.clientId);
                     if (client) handleSelectClient(client.id);

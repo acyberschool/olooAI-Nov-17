@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { useKanban } from '../hooks/useKanban';
-import { BusinessLine, Client, Deal, Document, DocumentCategory, DocumentOwnerType } from '../types';
+import { BusinessLine, Client, Deal, Document, DocumentCategory, DocumentOwnerType, Project } from '../types';
 
 interface AiDocGeneratorProps {
     category: DocumentCategory;
-    owner: BusinessLine | Client | Deal;
+    owner: BusinessLine | Client | Deal | Project;
     ownerType: DocumentOwnerType;
     kanbanApi: ReturnType<typeof useKanban>;
     isDriveConnected?: boolean;
@@ -17,6 +17,8 @@ const AiDocGenerator: React.FC<AiDocGeneratorProps> = ({ category, owner, ownerT
     const [isLoading, setIsLoading] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
     const [savedDoc, setSavedDoc] = useState<Document | null>(null);
+
+    const ownerName = 'name' in owner ? owner.name : owner.projectName;
 
     const handleGenerate = async (isRetry: boolean = false) => {
         if (!prompt) return;
@@ -52,7 +54,7 @@ const AiDocGenerator: React.FC<AiDocGeneratorProps> = ({ category, owner, ownerT
                 <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder={`Describe the ${category} document you want to draft for ${owner.name}...`}
+                    placeholder={`Describe the ${category} document you want to draft for ${ownerName}...`}
                     className="w-full h-24 bg-white border border-brevo-border rounded-md px-3 py-2 text-brevo-text-primary focus:ring-2 focus:ring-brevo-cta"
                 />
                 <div className="flex items-center space-x-3">

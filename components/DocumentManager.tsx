@@ -1,12 +1,12 @@
 
 import React, { useState, useRef } from 'react';
-import { Document, DocumentCategory, DocumentOwnerType, BusinessLine, Client, Deal } from '../types';
+import { Document, DocumentCategory, DocumentOwnerType, BusinessLine, Client, Deal, Project } from '../types';
 import AiDocGenerator from './AiDocGenerator';
 import { useKanban } from '../hooks/useKanban';
 
 interface DocumentManagerProps {
   documents: Document[];
-  owner: BusinessLine | Client | Deal;
+  owner: BusinessLine | Client | Deal | Project;
   ownerType: DocumentOwnerType;
   kanbanApi: ReturnType<typeof useKanban>;
   onAddDocument: (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => Document;

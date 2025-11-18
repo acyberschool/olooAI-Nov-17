@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, BusinessLine, Client, Deal, KanbanStatus, TaskType } from '../types';
 import { useKanban } from '../hooks/useKanban';
@@ -201,6 +202,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
   const currentClient = clients.find(c => c.id === task.clientId);
   const currentDeal = deals.find(d => d.id === task.dealId);
+  const currentProject = kanbanApi.projects.find(p => p.id === task.projectId);
   const currentBusinessLine = businessLines.find(bl => bl.id === task.businessLineId);
   const currentAssignee = kanbanApi.teamMembers.find(tm => tm.id === task.assigneeId);
 
@@ -256,6 +258,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Due Date</h4><input type="datetime-local" name="dueDate" value={editedTask.dueDate || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"/></div>
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Client</h4><select name="clientId" value={editedTask.clientId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">None</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Deal</h4><select name="dealId" value={editedTask.dealId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">None</option>{deals.filter(d => d.clientId === editedTask.clientId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+                    <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Project</h4><select name="projectId" value={editedTask.projectId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">None</option>{kanbanApi.projects.filter(p => !editedTask.clientId || p.clientId === editedTask.clientId).map(p => <option key={p.id} value={p.id}>{p.projectName}</option>)}</select></div>
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Business Line</h4><select name="businessLineId" value={editedTask.businessLineId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">None</option>{businessLines.map(bl => <option key={bl.id} value={bl.id}>{bl.name}</option>)}</select></div>
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Priority</h4><select name="priority" value={editedTask.priority || 'Medium'} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option>Low</option><option>Medium</option><option>High</option></select></div>
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Assignee</h4><select name="assigneeId" value={editedTask.assigneeId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">Unassigned</option>{kanbanApi.teamMembers.map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}</select></div>
@@ -266,6 +269,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary">Due Date</h4><p className="text-brevo-text-primary">{task.dueDate ? new Date(task.dueDate).toLocaleString() : 'Not set'}</p></div>
                     {currentClient && <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary">Client</h4><p className="text-brevo-text-primary">{currentClient.name}</p></div>}
                     {currentDeal && <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary">Deal</h4><p className="text-brevo-text-primary">{currentDeal.name}</p></div>}
+                    {currentProject && <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary">Project</h4><p className="text-brevo-text-primary">{currentProject.projectName}</p></div>}
                     {currentBusinessLine && <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary">Business Line</h4><p className="text-brevo-text-primary">{currentBusinessLine.name}</p></div>}
                     {task.priority && <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary">Priority</h4><p className="text-brevo-text-primary">{task.priority}</p></div>}
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary">Assignee</h4><p className="text-brevo-text-primary">{currentAssignee ? currentAssignee.name : 'Unassigned'}</p></div>

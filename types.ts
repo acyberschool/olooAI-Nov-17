@@ -1,3 +1,4 @@
+
 import type { FunctionDeclaration, Schema, Blob } from '@google/genai';
 import { Type, Modality } from '@google/genai';
 
@@ -67,6 +68,10 @@ export interface Client {
   officeNumber?: string;
   linkedinUrl?: string;
   twitterUrl?: string;
+  // AI Proposals
+  proposedLastTouchSummary?: string;
+  proposedNextAction?: string;
+  proposedNextActionDueDate?: string;
 }
 
 export interface Deal {
@@ -82,6 +87,11 @@ export interface Deal {
   currency: 'USD' | 'EUR' | 'GBP' | 'KES';
   revenueModel: 'Revenue Share' | 'Full Pay';
   amountPaid: number;
+  // AI Proposals
+  proposedLastTouchSummary?: string;
+  proposedNextAction?: string;
+  proposedNextActionDueDate?: string;
+  proposedStatus?: 'Open' | 'Closed - Won' | 'Closed - Lost';
 }
 
 export type ProjectStage = 'Lead' | 'In design' | 'Live' | 'Closing' | 'Dormant';

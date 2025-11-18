@@ -1,20 +1,60 @@
-import { useState, useCallback } from 'react';
+
+import { useState, useCallback, useEffect } from 'react';
 import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, FilterOptions, GeminiType, PlatformInsight, Project, TeamMember } from '../types';
 import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries, initialProjects, initialTeamMembers } from '../data/mockData';
 import { getAiInstance } from '../config/geminiConfig';
 import { processTextMessage } from '../services/routerBrainService';
 import { trackEvent } from '../App';
 
+// Helper for LocalStorage with error handling
+const usePersistentState = <T,>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] => {
+  const [state, setState] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(state));
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
+  }, [key, state]);
+
+  return [state, setState];
+};
+
 export const useKanban = () => {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [businessLines, setBusinessLines] = useState<BusinessLine[]>(initialBusinessLines);
-  const [clients, setClients] = useState<Client[]>(initialClients);
-  const [deals, setDeals] = useState<Deal[]>(initialDeals);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
-  const [playbooks, setPlaybooks] = useState<Playbook[]>(initialPlaybooks);
-  const [crmEntries, setCrmEntries] = useState<CRMEntry[]>(initialCRMEntries);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
+  // Persistent State for all core entities
+  const [tasks, setTasks] = usePersistentState<Task[]>('oloo_tasks', initialTasks);
+  const [businessLines, setBusinessLines] = usePersistentState<BusinessLine[]>('oloo_businessLines', initialBusinessLines);
+  const [clients, setClients] = usePersistentState<Client[]>('oloo_clients', initialClients);
+  const [deals, setDeals] = usePersistentState<Deal[]>('oloo_deals', initialDeals);
+  const [projects, setProjects] = usePersistentState<Project[]>('oloo_projects', initialProjects);
+  const [documents, setDocuments] = usePersistentState<Document[]>('oloo_documents', initialDocuments);
+  const [playbooks, setPlaybooks] = usePersistentState<Playbook[]>('oloo_playbooks', initialPlaybooks);
+  const [crmEntries, setCrmEntries] = usePersistentState<CRMEntry[]>('oloo_crmEntries', initialCRMEntries);
+  const [teamMembers, setTeamMembers] = usePersistentState<TeamMember[]>('oloo_teamMembers', initialTeamMembers);
+
+  // THE COACH: Check for overdue tasks on mount/update
+  useEffect(() => {
+      const overdueTasks = tasks.filter(t => 
+          t.dueDate && 
+          new Date(t.dueDate) < new Date() && 
+          t.status !== KanbanStatus.Done && 
+          t.status !== KanbanStatus.Terminated
+      );
+      
+      if (overdueTasks.length > 0) {
+          console.log(`[WALTER COACH]: You have ${overdueTasks.length} overdue tasks. Get to work!`);
+          // In a real implementation, this would trigger a visible notification or banner.
+      }
+  }, [tasks]);
 
   /**
    * Adds a document to the system.
@@ -41,7 +81,7 @@ export const useKanban = () => {
     };
     setDocuments(prev => [newDocument, ...prev]);
     return newDocument;
-  }, []);
+  }, [setDocuments]);
   
   const _addCRMEntryToState = (entryData: Omit<CRMEntry, 'id' | 'suggestions'>) => {
      const newEntry: CRMEntry = {
@@ -152,14 +192,13 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
     if (newTask.assigneeId) {
         const assignee = teamMembers.find(tm => tm.id === newTask.assigneeId);
         if (assignee) {
-             // Simulate sending email reminder
              console.log(`Simulating email to ${assignee.email}: New task assigned - ${newTask.title}`);
         }
     }
 
     trackEvent('create', 'Task', newTask.type);
     return `${newTask.type} "${newTask.title}" created successfully.`;
-  }, [businessLines, clients, deals, teamMembers]);
+  }, [businessLines, clients, deals, teamMembers, setTasks, setCrmEntries]);
 
   const generateAndAddPlaybook = useCallback(async (businessLine: BusinessLine) => {
     try {
@@ -200,7 +239,7 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
     } catch (e) {
         console.error("Error generating playbook:", e);
     }
-  }, []);
+  }, [setPlaybooks]);
 
   const addBusinessLine = useCallback(async (data: Omit<BusinessLine, 'id'>) => {
     if (businessLines.some(bl => bl.name.toLowerCase() === data.name.toLowerCase())) {
@@ -226,12 +265,12 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
     await generateAndAddPlaybook(newBusinessLine);
     trackEvent('create', 'Business Line', data.name);
     return `Business line "${data.name}" created.`;
-  }, [businessLines, generateAndAddPlaybook]);
+  }, [businessLines, generateAndAddPlaybook, setBusinessLines]);
 
   const updateBusinessLine = useCallback((id: string, data: Partial<Omit<BusinessLine, 'id'>>) => {
     setBusinessLines(prev => prev.map(bl => bl.id === id ? { ...bl, ...data } : bl));
     return `Business line updated.`;
-  }, []);
+  }, [setBusinessLines]);
 
   const deleteBusinessLine = useCallback((id: string) => {
     const clientsToDelete = clients.filter(c => c.businessLineId === id).map(c => c.id);
@@ -248,12 +287,12 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
     setCrmEntries(prev => prev.filter(e => !clientsToDelete.includes(e.clientId)));
     
     return `Business line and all related items deleted.`;
-}, [clients, deals]);
+}, [clients, deals, setBusinessLines, setClients, setDeals, setTasks, setDocuments, setCrmEntries]);
   
   const updatePlaybook = useCallback((playbookId: string, updatedSteps: PlaybookStep[]) => {
       setPlaybooks(prev => prev.map(p => p.id === playbookId ? { ...p, steps: updatedSteps } : p));
       return `Playbook updated.`;
-  }, []);
+  }, [setPlaybooks]);
   
   const addClient = useCallback((data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string }) => {
     if (clients.some(c => c.name.toLowerCase() === data.name.toLowerCase())) {
@@ -285,6 +324,16 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
       businessLineId: businessLine.id,
     };
     setClients(prev => [newClient, ...prev]);
+
+    // AUTO-TASK: Create initial task
+    addTask({
+        title: `Initial setup for ${newClient.name}`,
+        description: `Review client details and plan initial outreach. Focus: ${newClient.aiFocus}`,
+        clientId: newClient.id,
+        businessLineId: businessLine.id,
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
+    });
+
     _addCRMEntryToState({
         clientId: newClient.id,
         createdAt: new Date().toISOString(),
@@ -293,13 +342,108 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
         rawContent: `AI created client profile for "${newClient.name}"`
     });
     trackEvent('create', 'Client', data.name);
-    return `Client "${data.name}" created${assumptionMessage}.`;
-  }, [clients, businessLines]);
+    return `Client "${data.name}" created${assumptionMessage}. I've also added an initial task to your board.`;
+  }, [clients, businessLines, addTask, setClients]);
 
   const updateClient = useCallback((id: string, data: Partial<Omit<Client, 'id'>>) => {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
     return `Client updated.`;
-  }, []);
+  }, [setClients]);
+
+    const updateClientFromInteraction = useCallback(async (clientId: string, interactionText: string) => {
+        const client = clients.find(c => c.id === clientId);
+        if (!client) return;
+
+        try {
+            const ai = getAiInstance();
+            const prompt = `You are Walter, an AI business assistant. A new interaction has been logged for a client. Your job is to analyze it and propose updates.
+
+**Client Context:**
+- Name: ${client.name}
+- Description: ${client.description}
+- Current AI Focus: ${client.aiFocus}
+
+**New Interaction Logged:**
+"${interactionText}"
+
+**Your Task:**
+Based on the new interaction, propose a new "Last touch summary" (what just happened), a "Next action" (what to do next), and an updated "AI Focus" (if the strategy shifted).
+Return ONLY a valid JSON object with the keys: "lastTouchSummary", "nextAction", "nextActionDueDate", "aiFocus" (optional update).
+The due date should be in ISO 8601 format.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            lastTouchSummary: { type: GeminiType.STRING },
+                            nextAction: { type: GeminiType.STRING },
+                            nextActionDueDate: { type: GeminiType.STRING },
+                            aiFocus: { type: GeminiType.STRING, nullable: true }
+                        },
+                        required: ['lastTouchSummary', 'nextAction', 'nextActionDueDate']
+                    }
+                }
+            });
+            const updates = JSON.parse(response.text.trim());
+
+            setClients(prev => prev.map(c => c.id === clientId ? {
+                ...c,
+                proposedLastTouchSummary: updates.lastTouchSummary,
+                proposedNextAction: updates.nextAction,
+                proposedNextActionDueDate: updates.nextActionDueDate,
+                aiFocus: updates.aiFocus || c.aiFocus,
+            } : c));
+
+        } catch (e) {
+            console.error("Error updating client from interaction:", e);
+        }
+    }, [clients, setClients]);
+
+    const approveClientUpdate = useCallback((clientId: string) => {
+        const client = clients.find(c => c.id === clientId);
+        if (!client || !client.proposedLastTouchSummary) return;
+
+        // Log the interaction
+        _addCRMEntryToState({
+            clientId: client.id,
+            createdAt: new Date().toISOString(),
+            type: 'note',
+            summary: `Interaction logged: ${client.proposedLastTouchSummary}`,
+            rawContent: client.proposedLastTouchSummary,
+        });
+
+        // Create the next task
+        if (client.proposedNextAction) {
+             addTask({
+                title: client.proposedNextAction,
+                dueDate: client.proposedNextActionDueDate,
+                clientId: client.id,
+                businessLineId: client.businessLineId
+            });
+        }
+
+        // Clear proposals
+        setClients(prev => prev.map(c => c.id === clientId ? {
+            ...c,
+            proposedLastTouchSummary: undefined,
+            proposedNextAction: undefined,
+            proposedNextActionDueDate: undefined,
+        } : c));
+    }, [clients, addTask, setClients]);
+
+    const clearProposedClientUpdate = useCallback((clientId: string) => {
+         setClients(prev => prev.map(c => c.id === clientId ? {
+            ...c,
+            proposedLastTouchSummary: undefined,
+            proposedNextAction: undefined,
+            proposedNextActionDueDate: undefined,
+        } : c));
+    }, [setClients]);
+
 
   const deleteClient = useCallback((id: string) => {
     const dealsToDelete = deals.filter(d => d.clientId === id).map(d => d.id);
@@ -314,7 +458,7 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
     setCrmEntries(prev => prev.filter(e => e.clientId !== id));
 
     return `Client and all related items deleted.`;
-}, [deals]);
+}, [deals, setClients, setDeals, setTasks, setDocuments, setCrmEntries]);
 
   const addDeal = useCallback((data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string, clientId?: string, businessLineId?: string }) => {
     const client = clients.find(c => c.id === data.clientId || c.name.toLowerCase() === data.clientName.toLowerCase());
@@ -341,6 +485,17 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
       amountPaid: 0,
     };
     setDeals(prev => [newDeal, ...prev]);
+
+    // AUTO-TASK
+    addTask({
+        title: `Follow up on new deal: ${newDeal.name}`,
+        description: `Ensure all initial requirements for the deal are met.`,
+        clientId: client.id,
+        dealId: newDeal.id,
+        businessLineId: newDeal.businessLineId,
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString(),
+    });
+
      _addCRMEntryToState({
         clientId: newDeal.clientId,
         dealId: newDeal.id,
@@ -350,8 +505,8 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
         rawContent: `AI created deal: "${newDeal.name}" for ${newDeal.currency} ${newDeal.value}`
     });
     trackEvent('create', 'Deal', data.name);
-    return `Deal "${data.name}" created for client "${data.clientName}".`;
-  }, [deals, clients, playbooks]);
+    return `Deal "${data.name}" created for client "${data.clientName}". Task added to board.`;
+  }, [deals, clients, playbooks, addTask, setDeals]);
 
   const updateDeal = useCallback((id: string, data: Partial<Omit<Deal, 'id'>>) => {
       let originalDeal: Deal | undefined;
@@ -374,7 +529,96 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
             });
       }
       return `Deal updated.`;
-  }, []);
+  }, [setDeals]);
+
+    const updateDealFromInteraction = useCallback(async (dealId: string, interactionText: string) => {
+        const deal = deals.find(d => d.id === dealId);
+        if (!deal) return;
+
+        try {
+            const ai = getAiInstance();
+            const prompt = `You are Walter. Analyze this interaction for a Deal.
+**Deal:** ${deal.name} (${deal.description})
+**Interaction:** "${interactionText}"
+
+Propose: "lastTouchSummary", "nextAction", "nextActionDueDate" (ISO 8601), and "status" (Open, Closed - Won, Closed - Lost).
+Return valid JSON.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            lastTouchSummary: { type: GeminiType.STRING },
+                            nextAction: { type: GeminiType.STRING },
+                            nextActionDueDate: { type: GeminiType.STRING },
+                            status: { type: GeminiType.STRING, enum: ['Open', 'Closed - Won', 'Closed - Lost'] }
+                        },
+                        required: ['lastTouchSummary', 'nextAction', 'nextActionDueDate', 'status']
+                    }
+                }
+            });
+            const updates = JSON.parse(response.text.trim());
+
+            setDeals(prev => prev.map(d => d.id === dealId ? {
+                ...d,
+                proposedLastTouchSummary: updates.lastTouchSummary,
+                proposedNextAction: updates.nextAction,
+                proposedNextActionDueDate: updates.nextActionDueDate,
+                proposedStatus: updates.status
+            } : d));
+
+        } catch (e) {
+            console.error("Error updating deal from interaction:", e);
+        }
+    }, [deals, setDeals]);
+
+    const approveDealUpdate = useCallback((dealId: string) => {
+        const deal = deals.find(d => d.id === dealId);
+        if (!deal || !deal.proposedLastTouchSummary) return;
+
+        _addCRMEntryToState({
+            clientId: deal.clientId,
+            dealId: deal.id,
+            createdAt: new Date().toISOString(),
+            type: 'note',
+            summary: `Interaction: ${deal.proposedLastTouchSummary}`,
+            rawContent: deal.proposedLastTouchSummary
+        });
+
+        if (deal.proposedNextAction) {
+             addTask({
+                title: deal.proposedNextAction,
+                dueDate: deal.proposedNextActionDueDate,
+                clientId: deal.clientId,
+                dealId: deal.id,
+                businessLineId: deal.businessLineId
+            });
+        }
+
+        setDeals(prev => prev.map(d => d.id === dealId ? {
+            ...d,
+            status: d.proposedStatus || d.status,
+            proposedLastTouchSummary: undefined,
+            proposedNextAction: undefined,
+            proposedNextActionDueDate: undefined,
+            proposedStatus: undefined
+        } : d));
+    }, [deals, addTask, setDeals]);
+
+    const clearProposedDealUpdate = useCallback((dealId: string) => {
+         setDeals(prev => prev.map(d => d.id === dealId ? {
+            ...d,
+            proposedLastTouchSummary: undefined,
+            proposedNextAction: undefined,
+            proposedNextActionDueDate: undefined,
+            proposedStatus: undefined
+        } : d));
+    }, [setDeals]);
+
 
   const deleteDeal = useCallback((id: string) => {
     setDeals(prev => prev.filter(d => d.id !== id));
@@ -383,7 +627,7 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
     setCrmEntries(prev => prev.filter(e => e.dealId === id));
     
     return `Deal and all related items deleted.`;
-}, []);
+}, [setDeals, setTasks, setDocuments, setCrmEntries]);
 
     const addProject = useCallback((data: Partial<Omit<Project, 'id'>> & { partnerName: string; projectName: string; goal: string; }) => {
         const partnerAsClient = clients.find(c => c.name.toLowerCase() === data.partnerName.toLowerCase());
@@ -407,6 +651,16 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
             clientId: partnerAsClient?.id,
         };
         setProjects(prev => [newProject, ...prev]);
+        
+        // AUTO-TASK
+        addTask({
+            title: newProject.nextAction,
+            dueDate: newProject.nextActionDueDate,
+            projectId: newProject.id,
+            clientId: newProject.clientId,
+            description: `Goal: ${newProject.goal}`
+        });
+
         if (newProject.clientId) {
             _addCRMEntryToState({
                 clientId: newProject.clientId,
@@ -418,13 +672,13 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
             });
         }
         trackEvent('create', 'Project', newProject.projectName);
-        return `Project "${newProject.projectName}" created.`;
-    }, [clients]);
+        return `Project "${newProject.projectName}" created. Initial task added.`;
+    }, [clients, addTask, setProjects]);
 
     const updateProject = useCallback((id: string, data: Partial<Omit<Project, 'id'>>) => {
         setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
         return `Project updated.`;
-    }, []);
+    }, [setProjects]);
 
     const updateProjectFromInteraction = useCallback(async (projectId: string, interactionText: string) => {
         const project = projects.find(p => p.id === projectId);
@@ -480,7 +734,7 @@ The due date should be in ISO 8601 format.`;
         } catch (e) {
             console.error("Error updating project from interaction:", e);
         }
-    }, [projects]);
+    }, [projects, setProjects]);
     
     const approveProjectUpdate = useCallback((projectId: string) => {
         const project = projects.find(p => p.id === projectId);
@@ -506,6 +760,16 @@ The due date should be in ISO 8601 format.`;
             return p;
         }));
 
+        if (project.proposedNextAction) {
+             addTask({
+                title: project.proposedNextAction,
+                dueDate: project.proposedNextActionDueDate,
+                projectId: project.id,
+                clientId: project.clientId,
+                description: `Auto-generated from project interaction.`
+            });
+        }
+
         if (project.clientId) {
             _addCRMEntryToState({
                 clientId: project.clientId,
@@ -517,7 +781,7 @@ The due date should be in ISO 8601 format.`;
             });
         }
 
-    }, [projects]);
+    }, [projects, addTask, setProjects]);
     
     const clearProposedProjectUpdate = useCallback((projectId: string) => {
         setProjects(prev => prev.map(p => p.id === projectId ? {
@@ -527,13 +791,13 @@ The due date should be in ISO 8601 format.`;
              proposedNextActionDueDate: undefined,
              proposedStage: undefined,
         } : p));
-    }, []);
+    }, [setProjects]);
 
     const deleteProject = useCallback((id: string) => {
         setProjects(prev => prev.filter(p => p.id !== id));
         setTasks(prev => prev.filter(t => t.projectId !== id));
         return `Project and related tasks deleted.`;
-    }, []);
+    }, [setProjects, setTasks]);
   
   const addCRMEntryFromVoice = useCallback((data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => {
     if (!data.clientName) {
@@ -583,8 +847,7 @@ The due date should be in ISO 8601 format.`;
         const ai = getAiInstance();
         const client = clients.find(c => c.id === task.clientId);
         const lastCRMEntry = crmEntries.filter(c => c.clientId === task.clientId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-        const dealDocuments = documents.filter(doc => doc.ownerId === deal?.id).map(d => d.name).join(', ');
-
+        
         let prompt = `A task was just completed. Based on all the context, suggest 1-2 concrete, actionable next-step tasks.
         Return ONLY a valid JSON array of objects, where each object has a "text" (the suggestion for the user) and a "taskTitle" (the title for the new task).
         
@@ -642,7 +905,7 @@ The due date should be in ISO 8601 format.`;
         console.error("Error generating next step:", e);
     }
 
-  }, [tasks, deals, playbooks, clients, crmEntries, documents]);
+  }, [tasks, deals, playbooks, clients, crmEntries, documents, setDeals, setClients]);
 
   const updateTaskStatusById = useCallback(async (taskId: string, newStatus: KanbanStatus) => {
     let originalTask: Task | undefined;
@@ -673,7 +936,7 @@ The due date should be in ISO 8601 format.`;
             }
         }
     }
-  }, [generateNextStepSuggestions]);
+  }, [generateNextStepSuggestions, setTasks]);
 
   const updateTaskStatusByTitle = useCallback((taskTitle: string, newStatus: KanbanStatus) => {
     let taskUpdated = false;
@@ -697,7 +960,7 @@ The due date should be in ISO 8601 format.`;
     }
 
     return taskUpdated ? `Task "${foundTaskTitle}" moved to ${newStatus}.` : `Sorry, I couldn't find a task with the title "${taskTitle}".`;
-  }, [updateTaskStatusById]);
+  }, [updateTaskStatusById, setTasks]);
 
   const dismissSuggestions = useCallback((ownerType: 'client' | 'deal', ownerId: string) => {
     if (ownerType === 'client') {
@@ -705,7 +968,7 @@ The due date should be in ISO 8601 format.`;
     } else {
         setDeals(prev => prev.map(d => d.id === ownerId ? {...d, suggestions: []} : d));
     }
-  }, []);
+  }, [setClients, setDeals]);
   
   const getOpportunities = useCallback(async (businessLine: BusinessLine, expand: boolean = false): Promise<{ opportunities: Opportunity[], sources: any[] }> => {
     try {
@@ -802,12 +1065,13 @@ Business Line: ${businessLine?.name}`;
 
   const deleteDocument = useCallback((docId: string) => {
     setDocuments(prev => prev.filter(doc => doc.id !== docId));
-  }, []);
+  }, [setDocuments]);
 
-  const generateDocumentDraft = useCallback(async (prompt: string, category: DocumentCategory, owner: BusinessLine | Client | Deal, ownerType: DocumentOwnerType): Promise<string> => {
+  const generateDocumentDraft = useCallback(async (prompt: string, category: DocumentCategory, owner: BusinessLine | Client | Deal | Project, ownerType: DocumentOwnerType): Promise<string> => {
     try {
         const ai = getAiInstance();
-        let fullPrompt = `You are an expert business document writer. Generate a professional draft for a "${category}" document for a ${ownerType} named "${owner.name}". The user's request is: "${prompt}". Provide only the draft text, without any introductory phrases.`;
+        const ownerName = 'name' in owner ? owner.name : owner.projectName;
+        let fullPrompt = `You are an expert business document writer. Generate a professional draft for a "${category}" document for a ${ownerType} named "${ownerName}". The user's request is: "${prompt}". Provide only the draft text, without any introductory phrases.`;
 
         if (ownerType === 'client') {
             const client = owner as Client;
@@ -883,7 +1147,7 @@ Business Line: ${businessLine?.name}`;
         return `Payment of ${amount} logged for "${dealToUpdate.name}".`;
     }
     return 'Could not find deal to log payment.';
-  }, []);
+  }, [setDeals]);
 
   const findProspects = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<{ prospects: Prospect[], sources: any[] }> => {
     try {
@@ -1000,7 +1264,7 @@ Business Line: ${businessLine?.name}`;
             updateTaskStatusById(taskId, KanbanStatus.Done);
         }
     }
-}, [generateNextTaskFromSubtask, updateTaskStatusById]);
+}, [generateNextTaskFromSubtask, updateTaskStatusById, setTasks]);
 
   const generateSocialMediaIdeas = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<string[]> => {
     try {
@@ -1261,14 +1525,13 @@ Business Line: ${businessLine?.name}`;
         if (data.assigneeId && originalTask.assigneeId !== data.assigneeId) {
             const assignee = teamMembers.find(tm => tm.id === data.assigneeId);
             if (assignee) {
-                 // Simulate email notification
                  console.log(`Simulating email to ${assignee.email}: You have been assigned to task "${updatedTask.title}"`);
             }
         }
     }
     
     return `Task "${data.title}" updated.`;
-  }, [teamMembers]);
+  }, [teamMembers, setTasks]);
 
   const promoteSubtaskToTask = useCallback((taskId: string, subTaskId: string) => {
     const parentTask = tasks.find(t => t.id === taskId);
@@ -1289,7 +1552,7 @@ Business Line: ${businessLine?.name}`;
             t.id === taskId ? { ...t, subTasks: newSubTasks } : t
         ));
     }
-  }, [tasks, addTask]);
+  }, [tasks, addTask, setTasks]);
 
   const researchSubtask = useCallback(async (subtaskText: string, taskContext: string): Promise<string> => {
     try {
@@ -1364,7 +1627,7 @@ ${JSON.stringify(currentSubTaskTexts, null, 2)}
     } catch (e) {
         console.error("Error refining checklist:", e);
     }
-  }, [tasks, clients, deals]);
+  }, [tasks, clients, deals, setTasks]);
 
   const getPlatformQueryResponse = useCallback(async (query: string): Promise<string> => {
       try {
@@ -1423,9 +1686,7 @@ ${JSON.stringify(currentSubTaskTexts, null, 2)}
           status: 'Invited'
       };
       setTeamMembers(prev => [...prev, newMember]);
-      // Simulate sending invite email
-      console.log(`Simulating invite email to ${email}`);
-  }, []);
+  }, [setTeamMembers]);
 
   const generateMeetingTranscript = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -1433,10 +1694,10 @@ ${JSON.stringify(currentSubTaskTexts, null, 2)}
     
     try {
         const ai = getAiInstance();
-        const prompt = `Simulate a brief meeting transcript for a meeting about "${task.title}". Include 3 key bullet points discussed. Return ONLY the transcript text.`;
+        const prompt = `Simulate a brief meeting transcript for a meeting about "${task.title}". Include 2-3 speakers and action items.`;
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
         const transcript = response.text.trim();
-
+        
         if (task.clientId) {
              _addCRMEntryToState({
                 clientId: task.clientId,
@@ -1444,18 +1705,17 @@ ${JSON.stringify(currentSubTaskTexts, null, 2)}
                 projectId: task.projectId,
                 createdAt: new Date().toISOString(),
                 type: 'meeting',
-                summary: `Meeting Transcript for "${task.title}"`,
-                rawContent: transcript
-             });
+                summary: `Meeting Transcript: ${task.title}`,
+                rawContent: transcript,
+            });
         }
-        return transcript;
-    } catch(e) {
-        console.error("Error generating transcript", e);
+    } catch (e) {
+        console.error("Error generating transcript:", e);
     }
-  }, [tasks]);
+  }, [tasks, setCrmEntries]);
 
-  return { 
-    tasks, 
+  return {
+    tasks,
     businessLines,
     clients,
     deals,
@@ -1465,46 +1725,53 @@ ${JSON.stringify(currentSubTaskTexts, null, 2)}
     crmEntries,
     teamMembers,
     addTask,
-    updateTask,
     addBusinessLine,
     updateBusinessLine,
     deleteBusinessLine,
-    updatePlaybook,
     addClient,
     updateClient,
+    updateClientFromInteraction,
+    approveClientUpdate,
+    clearProposedClientUpdate,
     deleteClient,
     addDeal,
     updateDeal,
+    updateDealFromInteraction,
+    approveDealUpdate,
+    clearProposedDealUpdate,
     deleteDeal,
     addProject,
     updateProject,
-    deleteProject,
     updateProjectFromInteraction,
     approveProjectUpdate,
     clearProposedProjectUpdate,
-    addCRMEntryFromVoice,
-    updateTaskStatusById, 
-    updateTaskStatusByTitle,
-    dismissSuggestions,
-    getOpportunities,
-    getClientOpportunities,
-    getDealOpportunities,
+    deleteProject,
     addDocument,
     deleteDocument,
+    addCRMEntryFromVoice,
+    updateTaskStatusById,
+    updateTaskStatusByTitle,
     generateDocumentDraft,
     generateMarketingCollateralContent,
     enhanceUserPrompt,
     logPaymentOnDeal,
     findProspects,
     findProspectsByName,
+    generateNextTaskFromSubtask,
     toggleSubTask,
     generateSocialMediaIdeas,
     processTextAndExecute,
     regeneratePlaybook,
+    updatePlaybook,
+    dismissSuggestions,
+    getOpportunities,
+    getClientOpportunities,
+    getDealOpportunities,
     getClientPulse,
     getCompetitorInsights,
     generateDocumentFromSubtask,
     getPlatformInsights,
+    updateTask,
     promoteSubtaskToTask,
     researchSubtask,
     refineTaskChecklist,

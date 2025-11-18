@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BusinessLine, Task, Client, Deal, Opportunity, Document, Playbook } from '../types';
 import KanbanBoard from './KanbanBoard';
@@ -29,6 +30,40 @@ interface BusinessLineDetailViewProps {
 type BusinessLineTab = 'Overview' | 'Work' | 'Clients' | 'Revenue' | 'Prospects' | 'Playbook' | 'Documents' | 'Revenue Ideas' | 'Competitors';
 
 const EditIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>);
+
+// Reusable Editable Title
+const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> = ({ value, onSave }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [text, setText] = useState(value);
+    
+    useEffect(() => setText(value), [value]);
+
+    const handleSave = () => {
+        if (text.trim()) onSave(text.trim());
+        setIsEditing(false);
+    }
+
+    if (isEditing) {
+        return (
+            <div className="flex items-center gap-2">
+                <input 
+                    autoFocus
+                    value={text} 
+                    onChange={e => setText(e.target.value)} 
+                    className="text-3xl font-semibold text-brevo-text-primary border-b-2 border-brevo-cta outline-none bg-transparent w-full"
+                    onBlur={handleSave}
+                    onKeyDown={e => e.key === 'Enter' && handleSave()}
+                />
+            </div>
+        )
+    }
+    return (
+        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditing(true)}>
+            <h1 className="text-3xl font-semibold text-brevo-text-primary">{value}</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+        </div>
+    )
+}
 
 // A new local component for inline editing
 const EditableField: React.FC<{
@@ -110,7 +145,10 @@ const BusinessLineDetailView: React.FC<BusinessLineDetailViewProps> = (props) =>
                 <button onClick={onBack} className="text-sm text-brevo-cta hover:underline font-medium mb-2">
                     &larr; Back to all Business Lines
                 </button>
-                <h1 className="text-3xl font-semibold text-brevo-text-primary">{businessLine.name}</h1>
+                <EditableTitle 
+                    value={businessLine.name}
+                    onSave={(val) => props.kanbanApi.updateBusinessLine(businessLine.id, { name: val })}
+                />
             </div>
         </div>
       <Tabs

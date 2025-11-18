@@ -10,6 +10,7 @@ import EditTaskModal from './EditTaskModal';
 import Tabs from './Tabs';
 import CRMIcon from './CRMIcon';
 import LogPaymentModal from './LogPaymentModal';
+import ContextualWalter from './ContextualWalter';
 
 interface DealDetailViewProps {
   deal: Deal;
@@ -22,11 +23,45 @@ interface DealDetailViewProps {
   onSelectBusinessLine: (id: string) => void;
   onBack: () => void;
   onSelectTask: (task: Task) => void;
+  clients: Client[]; // Needed for changing client
 }
 
 type DealTab = 'Overview' | 'Work' | 'Documents' | 'AI Ideas' | 'History';
 
 const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
+
+const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> = ({ value, onSave }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [text, setText] = useState(value);
+    
+    useEffect(() => setText(value), [value]);
+
+    const handleSave = () => {
+        if (text.trim()) onSave(text.trim());
+        setIsEditing(false);
+    }
+
+    if (isEditing) {
+        return (
+            <div className="flex items-center gap-2">
+                <input 
+                    autoFocus
+                    value={text} 
+                    onChange={e => setText(e.target.value)} 
+                    className="text-3xl font-semibold text-brevo-text-primary border-b-2 border-brevo-cta outline-none bg-transparent w-full"
+                    onBlur={handleSave}
+                    onKeyDown={e => e.key === 'Enter' && handleSave()}
+                />
+            </div>
+        )
+    }
+    return (
+        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditing(true)}>
+            <h1 className="text-3xl font-semibold text-[#111827] mb-2">{value}</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+        </div>
+    )
+}
 
 const EditableField: React.FC<{
   label: string;
@@ -126,8 +161,19 @@ const EditableValueField: React.FC<{
 }
 
 const DealDetailView: React.FC<DealDetailViewProps> = (props) => {
-  const { deal, client, businessLine, onSelectClient, onSelectBusinessLine } = props;
+  const { deal, client, businessLine, onSelectClient, onSelectBusinessLine, kanbanApi } = props;
   const [activeTab, setActiveTab] = useState<DealTab>('Overview');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+    const handleUpdate = async (text: string) => {
+        setIsUpdating(true);
+        await kanbanApi.updateDealFromInteraction(deal.id, text);
+        setIsUpdating(false);
+    };
+
+    const handleClientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        kanbanApi.updateDeal(deal.id, { clientId: e.target.value });
+    }
   
   const tabContent = () => {
     switch (activeTab) {
@@ -142,13 +188,40 @@ const DealDetailView: React.FC<DealDetailViewProps> = (props) => {
 
   return (
     <div className="space-y-6">
-      <div className="text-base text-[#6B7280]">
+      <div className="text-base text-[#6B7280] flex items-center flex-wrap">
         <span onClick={() => onSelectBusinessLine(businessLine.id)} className="hover:underline cursor-pointer">{businessLine.name}</span>
         <span className="mx-2">&gt;</span>
-        <span onClick={() => onSelectClient(client.id)} className="hover:underline cursor-pointer">{client.name}</span>
+        <div className="flex items-center">
+             <span className="mr-2">Client:</span>
+             <select
+                value={client.id}
+                onChange={handleClientChange}
+                className="bg-transparent font-medium hover:bg-gray-100 rounded cursor-pointer focus:ring-2 focus:ring-brevo-cta"
+             >
+                 {props.clients.map(c => (
+                     <option key={c.id} value={c.id}>{c.name}</option>
+                 ))}
+             </select>
+        </div>
         <span className="mx-2">&gt;</span>
         <span className="text-[#111827] font-semibold">{deal.name}</span>
       </div>
+      
+      {/* Contextual Walter */}
+       <ContextualWalter
+            onUpdate={handleUpdate}
+            onApprove={() => kanbanApi.approveDealUpdate(deal.id)}
+            onDismiss={() => kanbanApi.clearProposedDealUpdate(deal.id)}
+            isUpdating={isUpdating}
+            entityName="Deal"
+            proposedChanges={{
+                summary: deal.proposedLastTouchSummary,
+                nextAction: deal.proposedNextAction,
+                nextActionDate: deal.proposedNextActionDueDate,
+                status: deal.proposedStatus,
+            }}
+            placeholder="e.g., Spoke with Finance. Budget is approved, waiting for PO..."
+        />
 
        <Tabs
         tabs={['Overview', 'Work', 'Documents', 'AI Ideas', 'History']}
@@ -186,7 +259,10 @@ const OverviewTab: React.FC<DealDetailViewProps> = ({ deal, client, kanbanApi, o
         <div className="bg-white p-6 rounded-xl shadow-lg border border-[#E5E7EB] space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div className="w-full">
-                    <h1 className="text-3xl font-semibold text-[#111827] mb-2">{deal.name}</h1>
+                    <EditableTitle 
+                        value={deal.name}
+                        onSave={(val) => kanbanApi.updateDeal(deal.id, { name: val })}
+                    />
                     <EditableField
                         label="Description"
                         value={deal.description}

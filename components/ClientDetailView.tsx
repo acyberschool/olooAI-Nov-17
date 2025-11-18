@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Client, Task, Deal, Opportunity, Document, BusinessLine, CRMEntry, Suggestion, Project } from '../types';
 import KanbanBoard from './KanbanBoard';
@@ -11,6 +12,7 @@ import Tabs from './Tabs';
 import { UniversalInputContext } from '../App';
 import ClientPulseView from './ClientPulseView';
 import EmailClientModal from './EmailClientModal';
+import ContextualWalter from './ContextualWalter';
 
 interface ClientDetailViewProps {
   client: Client;
@@ -33,6 +35,40 @@ type ClientTab = 'Overview' | 'Work' | 'Conversations' | 'Client Pulse' | 'Docum
 
 const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 const PaperclipIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>);
+
+// Reusable Editable Title
+const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> = ({ value, onSave }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [text, setText] = useState(value);
+    
+    useEffect(() => setText(value), [value]);
+
+    const handleSave = () => {
+        if (text.trim()) onSave(text.trim());
+        setIsEditing(false);
+    }
+
+    if (isEditing) {
+        return (
+            <div className="flex items-center gap-2">
+                <input 
+                    autoFocus
+                    value={text} 
+                    onChange={e => setText(e.target.value)} 
+                    className="text-3xl font-semibold text-brevo-text-primary border-b-2 border-brevo-cta outline-none bg-transparent w-full"
+                    onBlur={handleSave}
+                    onKeyDown={e => e.key === 'Enter' && handleSave()}
+                />
+            </div>
+        )
+    }
+    return (
+        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditing(true)}>
+            <h1 className="text-3xl font-semibold text-brevo-text-primary">{value}</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+        </div>
+    )
+}
 
 const EditableField: React.FC<{
   label: string;
@@ -90,14 +126,21 @@ const EditableField: React.FC<{
 const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
     const { client, onBack, onSelectBusinessLine } = props;
     const [activeTab, setActiveTab] = useState<ClientTab>('Overview');
+    const [isUpdating, setIsUpdating] = useState(false);
 
-    const getBusinessLineName = (id: string) => {
-        return props.businessLines.find(bl => bl.id === id)?.name || 'N/A';
+    const handleUpdate = async (text: string) => {
+        setIsUpdating(true);
+        await props.kanbanApi.updateClientFromInteraction(client.id, text);
+        setIsUpdating(false);
+    };
+
+    const handleBusinessLineChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        props.kanbanApi.updateClient(client.id, { businessLineId: e.target.value });
     }
 
     const tabContent = () => {
         switch (activeTab) {
-            case 'Overview': return <OverviewTab {...props} getBusinessLineName={getBusinessLineName} />;
+            case 'Overview': return <OverviewTab {...props} />;
             case 'Work': return <WorkTab {...props} />;
             case 'Conversations': return <ConversationsTab {...props} />;
             case 'Client Pulse': return <ClientPulseView client={props.client} kanbanApi={props.kanbanApi} />;
@@ -114,14 +157,41 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
                  <button onClick={onBack} className="text-sm text-brevo-cta hover:underline font-medium mb-2">
                     &larr; Back to all Clients
                 </button>
-                <h1 className="text-3xl font-semibold text-brevo-text-primary">{client.name}</h1>
-                <div className="flex items-center space-x-4 mt-2">
-                    <span onClick={() => onSelectBusinessLine(client.businessLineId)} className="bg-gray-100 text-gray-800 rounded-full px-3 py-1 w-fit cursor-pointer hover:bg-gray-200">
-                        Part of: {getBusinessLineName(client.businessLineId)}
-                    </span>
+                <EditableTitle 
+                    value={client.name} 
+                    onSave={(val) => props.kanbanApi.updateClient(client.id, { name: val })}
+                />
+                <div className="flex items-center space-x-2 mt-2">
+                    <span className="text-sm text-brevo-text-secondary">Part of:</span>
+                    <select 
+                        value={client.businessLineId} 
+                        onChange={handleBusinessLineChange} 
+                        className="bg-gray-100 text-gray-800 rounded-full px-3 py-1 text-sm font-medium border-none focus:ring-2 focus:ring-brevo-cta cursor-pointer hover:bg-gray-200"
+                    >
+                        {props.businessLines.map(bl => (
+                            <option key={bl.id} value={bl.id}>{bl.name}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
         </div>
+        
+        {/* Contextual Walter for Clients */}
+        <ContextualWalter 
+            onUpdate={handleUpdate}
+            onApprove={() => props.kanbanApi.approveClientUpdate(client.id)}
+            onDismiss={() => props.kanbanApi.clearProposedClientUpdate(client.id)}
+            isUpdating={isUpdating}
+            entityName="Client"
+            proposedChanges={{
+                summary: client.proposedLastTouchSummary,
+                nextAction: client.proposedNextAction,
+                nextActionDate: client.proposedNextActionDueDate,
+                aiFocus: undefined 
+            }}
+            placeholder="e.g., Met with the procurement team. They are ready to sign next week..."
+        />
+
         <Tabs
             tabs={['Overview', 'Work', 'Conversations', 'Client Pulse', 'Documents', 'AI Ideas']}
             activeTab={activeTab}
@@ -151,7 +221,7 @@ const ContactInfoCard: React.FC<{ client: Client, onEmailClick: () => void }> = 
 );
 
 
-const OverviewTab: React.FC<ClientDetailViewProps & { getBusinessLineName: (id: string) => string }> = ({ client, kanbanApi, onBack }) => {
+const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBack }) => {
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
     return (
@@ -336,14 +406,14 @@ const DocumentsTab: React.FC<ClientDetailViewProps> = ({ documents, client, kanb
 const AiIdeasTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi }) => {
     const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
     const [opportunitySources, setOpportunitySources] = useState<any[]>([]);
-    const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     
     const handleGetOpportunities = async (expand = false) => {
-        setIsLoadingOpportunities(true);
+        setIsLoading(true);
         const { opportunities: result, sources } = await kanbanApi.getClientOpportunities(client, expand);
         setOpportunities(result);
         setOpportunitySources(sources);
-        setIsLoadingOpportunities(false);
+        setIsLoading(false);
     };
 
     const handleAddOpportunityAsTask = (opportunityText: string) => {
@@ -361,10 +431,10 @@ const AiIdeasTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi }) => {
                 <div className="flex space-x-4">
                     <button 
                         onClick={() => handleGetOpportunities(false)} 
-                        disabled={isLoadingOpportunities}
+                        disabled={isLoading}
                         className="bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300"
                     >
-                        {isLoadingOpportunities ? 'Analyzing...' : 'Ask AI for ideas'}
+                        {isLoading ? 'Analyzing...' : 'Ask AI for ideas'}
                     </button>
                 </div>
                 {opportunities.length > 0 && (
