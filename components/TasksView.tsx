@@ -1,29 +1,30 @@
-
-
 import React, { useState, useMemo } from 'react';
-import { Task, KanbanStatus, BusinessLine, Client, Deal } from '../types';
+import { Task, KanbanStatus, BusinessLine, Client, Deal, Project } from '../types';
 import KanbanBoard from './KanbanBoard';
 import CalendarView from './CalendarView';
 import Tabs from './Tabs';
 import { UniversalInputContext } from '../App';
 import PerformanceSnapshot from './PerformanceSnapshot';
 import { useKanban } from '../hooks/useKanban';
+import GanttChartView from './GanttChartView';
 
 interface TasksViewProps {
   tasks: Task[];
   businessLines: BusinessLine[];
   clients: Client[];
   deals: Deal[];
+  projects: Project[];
   updateTaskStatus: (taskId: string, newStatus: KanbanStatus) => void;
   onSelectBusinessLine: (id: string) => void;
   onSelectClient: (id: string) => void;
   onSelectDeal: (id: string) => void;
+  onSelectProject: (id: string) => void;
   onSelectTask: (task: Task) => void;
   onOpenUniversalInput: (context: UniversalInputContext) => void;
   kanbanApi: ReturnType<typeof useKanban>;
 }
 
-type HomepageTab = 'Today' | 'All tasks' | 'Deals' | 'Clients';
+type HomepageTab = 'Today' | 'All tasks' | 'Deals' | 'Clients' | 'Projects';
 
 const TasksView: React.FC<TasksViewProps> = (props) => {
   const [activeTab, setActiveTab] = useState<HomepageTab>('Today');
@@ -34,6 +35,7 @@ const TasksView: React.FC<TasksViewProps> = (props) => {
         case 'All tasks': return <AllTasksTab {...props} />;
         case 'Deals': return <DealsTab {...props} />;
         case 'Clients': return <ClientsTab {...props} />;
+        case 'Projects': return <ProjectsTab {...props} />;
         default: return null;
     }
   }
@@ -42,7 +44,7 @@ const TasksView: React.FC<TasksViewProps> = (props) => {
     <div>
         <h2 className="text-2xl font-semibold text-brevo-text-primary mb-4">Homepage</h2>
         <Tabs
-            tabs={['Today', 'All tasks', 'Deals', 'Clients']}
+            tabs={['Today', 'All tasks', 'Deals', 'Clients', 'Projects']}
             activeTab={activeTab}
             setActiveTab={setActiveTab as (tab: string) => void}
         />
@@ -87,7 +89,6 @@ const TodayTab: React.FC<TasksViewProps> = (props) => {
             <PerformanceSnapshot 
                 deals={props.deals}
                 tasks={props.tasks}
-                insights={props.kanbanApi.getPlatformInsights()}
             />
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
                 <div className="flex justify-between items-center mb-4">
@@ -121,16 +122,19 @@ const TodayTab: React.FC<TasksViewProps> = (props) => {
 }
 
 const AllTasksTab: React.FC<TasksViewProps> = (props) => {
-    const [viewMode, setViewMode] = useState<'kanban' | 'calendar'>('kanban');
+    const [viewMode, setViewMode] = useState<'kanban' | 'calendar' | 'gantt'>('kanban');
     return (
         <div>
             <div className="flex justify-end mb-4">
                 <div className="flex items-center bg-gray-100 rounded-lg p-1">
                     <button onClick={() => setViewMode('kanban')} className={`px-4 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-brevo-cta text-white' : 'text-brevo-text-secondary hover:bg-gray-200'}`}>Kanban</button>
                     <button onClick={() => setViewMode('calendar')} className={`px-4 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-brevo-cta text-white' : 'text-brevo-text-secondary hover:bg-gray-200'}`}>Calendar</button>
+                    <button onClick={() => setViewMode('gantt')} className={`px-4 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'gantt' ? 'bg-brevo-cta text-white' : 'text-brevo-text-secondary hover:bg-gray-200'}`}>Gantt</button>
                 </div>
             </div>
-            {viewMode === 'kanban' ? <KanbanBoard {...props} /> : <CalendarView {...props} />}
+            {viewMode === 'kanban' && <KanbanBoard {...props} />}
+            {viewMode === 'calendar' && <CalendarView {...props} />}
+            {viewMode === 'gantt' && <GanttChartView tasks={props.tasks} onSelectTask={props.onSelectTask} />}
         </div>
     );
 }
@@ -144,6 +148,11 @@ const DealsTab: React.FC<TasksViewProps> = ({ deals, clients, onSelectDeal }) =>
           default: return 'bg-gray-200 text-gray-800';
         }
     };
+
+    if (deals.length === 0) {
+         return <div className="text-center py-12 text-brevo-text-secondary bg-white rounded-xl border border-dashed border-gray-300">No deals yet.</div>
+    }
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {deals.map((deal) => (
@@ -164,7 +173,11 @@ const DealsTab: React.FC<TasksViewProps> = ({ deals, clients, onSelectDeal }) =>
     );
 };
 
-const ClientsTab: React.FC<TasksViewProps> = ({ clients, businessLines, onSelectClient }) => (
+const ClientsTab: React.FC<TasksViewProps> = ({ clients, businessLines, onSelectClient }) => {
+    if (clients.length === 0) {
+        return <div className="text-center py-12 text-brevo-text-secondary bg-white rounded-xl border border-dashed border-gray-300">No clients yet.</div>
+    }
+    return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {clients.map((client) => (
         <div key={client.id} className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border flex flex-col justify-between hover:border-brevo-cta-hover transition-all cursor-pointer" onClick={() => onSelectClient(client.id)}>
@@ -179,7 +192,29 @@ const ClientsTab: React.FC<TasksViewProps> = ({ clients, businessLines, onSelect
         </div>
       ))}
     </div>
-);
+    );
+};
 
+const ProjectsTab: React.FC<TasksViewProps> = ({ projects, clients, onSelectProject }) => {
+     if (projects.length === 0) {
+        return <div className="text-center py-12 text-brevo-text-secondary bg-white rounded-xl border border-dashed border-gray-300">No projects yet.</div>
+    }
+    return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {projects.map((project) => (
+        <div key={project.id} className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border flex flex-col justify-between hover:border-brevo-cta-hover transition-all cursor-pointer" onClick={() => onSelectProject(project.id)}>
+          <div>
+            <h3 className="font-semibold text-lg mb-2 text-brevo-text-primary">{project.projectName}</h3>
+            <p className="text-brevo-text-secondary text-sm mb-4">{project.goal}</p>
+            <p className="text-sm bg-blue-100 text-blue-800 rounded-full px-3 py-1 w-fit">Client: {clients.find(c => c.id === project.clientId)?.name || 'N/A'}</p>
+          </div>
+          <div className="mt-4 pt-4 border-t border-brevo-border flex justify-end">
+            <span className="text-xs font-semibold rounded-full px-3 py-1 bg-purple-100 text-purple-800">{project.stage}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+    );
+};
 
 export default TasksView;

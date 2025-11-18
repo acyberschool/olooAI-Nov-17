@@ -109,9 +109,10 @@ const DealsView: React.FC<DealsViewProps> = ({ deals, clients, businessLines, on
           ))}
         </div>
       ) : (
-        <div className="text-center py-16">
-          <p className="text-brevo-text-secondary">No deals created yet.</p>
-          <p className="text-brevo-text-secondary">Click "+ Add deal" or use your voice to add one!</p>
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300">
+          <p className="text-lg font-medium text-brevo-text-primary mb-2">No deals tracked</p>
+          <p className="text-brevo-text-secondary mb-4">Manage your sales pipeline here.</p>
+          <button onClick={handleAddClick} className="text-brevo-cta hover:underline">Create your first deal</button>
         </div>
       )}
 

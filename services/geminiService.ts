@@ -1,6 +1,3 @@
-
-
-
 import { GeminiBlob, GeminiFunctionDeclaration, GeminiModality, GeminiType } from '../types';
 import { getAiInstance } from '../config/geminiConfig';
 
@@ -58,6 +55,18 @@ export function createPcmBlob(data: Float32Array): GeminiBlob {
 
 
 // --- Function Calling Schemas ---
+
+const queryPlatformDeclaration: GeminiFunctionDeclaration = {
+    name: 'queryPlatform',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Answers user questions about their own data within the platform. Use for queries like "What should I focus on today?", "Summarize my open deals", or "Any overdue tasks for ABC Limited?". This is for reading and summarizing data, not for creating or updating items.',
+        properties: {
+            query: { type: GeminiType.STRING, description: 'The user\'s question about their platform data.' },
+        },
+        required: ['query'],
+    },
+};
 
 const findProspectsDeclaration: GeminiFunctionDeclaration = {
     name: 'findProspects',
@@ -208,6 +217,24 @@ const createDealDeclaration: GeminiFunctionDeclaration = {
   },
 };
 
+const createProjectDeclaration: GeminiFunctionDeclaration = {
+    name: 'createProject',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Parses a user\'s conversational input to create a new, structured project record. Fills as many fields as possible from the natural language input.',
+        properties: {
+            partnerName: { type: GeminiType.STRING, description: 'The name of the partner or organisation.' },
+            projectName: { type: GeminiType.STRING, description: 'The name of the project. Propose a clean name if not explicitly stated.' },
+            goal: { type: GeminiType.STRING, description: 'A one-line goal or "Why this matters".' },
+            dealType: { type: GeminiType.STRING, description: 'The type of deal. Must be one of: "Revenue Share", "Fee-based", "Grant", "In-kind".' },
+            expectedRevenue: { type: GeminiType.NUMBER, description: 'A rough number for expected revenue this year.' },
+            impactMetric: { type: GeminiType.STRING, description: 'The main impact metric, e.g., "# learners", "# SMEs".' },
+            stage: { type: GeminiType.STRING, description: 'The initial stage. Usually "Lead" or "In design".' },
+        },
+        required: ['partnerName', 'projectName', 'goal'],
+    },
+};
+
 const updateDealStatusDeclaration: GeminiFunctionDeclaration = {
     name: 'updateDealStatus',
     parameters: {
@@ -228,8 +255,10 @@ const assistantTools = [{ functionDeclarations: [
     createBusinessLineDeclaration,
     createClientDeclaration,
     createDealDeclaration,
+    createProjectDeclaration,
     updateDealStatusDeclaration,
     findProspectsDeclaration,
+    queryPlatformDeclaration,
 ] }];
 
 // --- Live API Service ---

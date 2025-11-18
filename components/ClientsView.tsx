@@ -91,9 +91,10 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, businessLines, onSel
           ))}
         </div>
       ) : (
-        <div className="text-center py-16">
-          <p className="text-brevo-text-secondary">No clients created yet.</p>
-          <p className="text-brevo-text-secondary">Click "+ Add client" or use your voice to add one!</p>
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300">
+          <p className="text-lg font-medium text-brevo-text-primary mb-2">No clients yet</p>
+          <p className="text-brevo-text-secondary mb-4">Add clients to start tracking work and deals.</p>
+          <button onClick={handleAddClick} className="text-brevo-cta hover:underline">Add your first client</button>
         </div>
       )}
 

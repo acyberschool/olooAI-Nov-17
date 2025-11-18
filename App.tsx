@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import VoiceControl from './components/VoiceControl';
 import ChatInterface from './components/ChatInterface';
@@ -20,6 +21,9 @@ import UniversalInputModal from './components/UniversalInputModal';
 import DataInsightsView from './components/DataInsightsView';
 import SettingsView from './components/SettingsView';
 import { getApiKey } from './config/geminiConfig';
+import Walkthrough from './components/Walkthrough';
+import ProjectsView from './components/ProjectsView';
+import ProjectDetailView from './components/ProjectDetailView';
 
 // --- Check for API Key at the module level before the app renders ---
 let isApiKeyAvailable = true;
@@ -45,13 +49,14 @@ export const trackEvent = (action: string, category: string, label: string, valu
     }
 }
 
-export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'crm' | 'team' | 'data' | 'settings';
+export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'projects' | 'crm' | 'team' | 'data' | 'settings';
 export type UniversalInputContext = {
     clientId?: string;
     dealId?: string;
     businessLineId?: string;
     task?: Task;
     placeholder?: string;
+    date?: Date;
 };
 
 const MenuIcon = () => (
@@ -98,6 +103,7 @@ export default function App() {
   const [selectedBusinessLineId, setSelectedBusinessLineId] = useState<string | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
   const [isChatVisible, setIsChatVisible] = useState(false);
@@ -105,6 +111,21 @@ export default function App() {
 
   const [isUniversalInputOpen, setIsUniversalInputOpen] = useState(false);
   const [universalInputContext, setUniversalInputContext] = useState<UniversalInputContext>({});
+
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+
+  useEffect(() => {
+    const hasSeenWalkthrough = localStorage.getItem('walkthroughCompleted');
+    if (!hasSeenWalkthrough) {
+      setShowWalkthrough(true);
+    }
+  }, []);
+
+  const handleWalkthroughComplete = () => {
+    localStorage.setItem('walkthroughCompleted', 'true');
+    setShowWalkthrough(false);
+  };
+
 
   const handleTurnComplete = (user: string, assistant: string) => {
     if (user || assistant) {
@@ -115,6 +136,27 @@ export default function App() {
 
   const kanban = useKanban();
 
+  /**
+   * FIX: This `useEffect` hook ensures that if the currently selected task is updated
+   * (e.g., its status changes, or its details are edited), the `selectedTask` state
+   * is updated with the fresh data from the main `kanban.tasks` array.
+   * This prevents the TaskDetailModal from showing stale data after an update.
+   */
+  useEffect(() => {
+      if (selectedTask) {
+          const updatedTaskInList = kanban.tasks.find(t => t.id === selectedTask.id);
+          if (updatedTaskInList) {
+              // Deep comparison to avoid unnecessary re-renders
+              if (JSON.stringify(selectedTask) !== JSON.stringify(updatedTaskInList)) {
+                  setSelectedTask(updatedTaskInList);
+              }
+          } else {
+              // Task was deleted, so close the modal
+              setSelectedTask(null);
+          }
+      }
+  }, [kanban.tasks, selectedTask]);
+
   const platformActivitySummary = `Last 3 tasks: ${kanban.tasks.slice(0,3).map(t => t.title).join(', ')}. Last 3 CRM notes: ${kanban.crmEntries.slice(0,3).map(c => c.summary).join(', ')}.`;
 
   const assistant = useVoiceAssistant({
@@ -124,27 +166,22 @@ export default function App() {
     onBusinessLineCreate: kanban.addBusinessLine,
     onClientCreate: kanban.addClient,
     onDealCreate: kanban.addDeal,
+    onProjectCreate: kanban.addProject,
     onDealStatusUpdate: (dealId, status) => kanban.updateDeal(dealId, { status }),
     onTurnComplete: handleTurnComplete,
     onFindProspects: kanban.findProspectsByName,
+    onPlatformQuery: kanban.getPlatformQueryResponse,
     currentBusinessLineId: selectedBusinessLineId,
     currentClientId: selectedClientId,
     currentDealId: selectedDealId,
     platformActivitySummary,
   });
 
-  useEffect(() => {
-    // Pre-load a business line for a better initial experience
-    if (kanban.businessLines.length > 0 && !selectedBusinessLineId) {
-      setSelectedBusinessLineId(kanban.businessLines[0].id);
-    }
-  }, [kanban.businessLines]);
-
-
   const clearSelections = () => {
     setSelectedBusinessLineId(null);
     setSelectedClientId(null);
     setSelectedDealId(null);
+    setSelectedProjectId(null);
     setSelectedTask(null);
   }
 
@@ -176,6 +213,13 @@ export default function App() {
     setSelectedDealId(id);
   }
 
+  const handleSelectProject = (id: string) => {
+    trackEvent('select', 'Project', id);
+    clearSelections();
+    setActiveView('projects');
+    setSelectedProjectId(id);
+  }
+
   const handleSelectTask = (task: Task) => {
     setSelectedTask(task);
   }
@@ -191,6 +235,27 @@ export default function App() {
   };
 
   const renderView = () => {
+    if (selectedProjectId) {
+        const project = kanban.projects.find(p => p.id === selectedProjectId);
+        if (project) {
+            // FIX: The Project type does not have a businessLineId. The business line is associated via the client.
+            // First, find the client associated with the project.
+            const client = kanban.clients.find(c => c.id === project.clientId);
+            // Then, use the client's businessLineId to find the business line.
+            const businessLine = client ? kanban.businessLines.find(bl => bl.id === client.businessLineId) : undefined;
+            
+            return <ProjectDetailView
+                project={project}
+                client={client!}
+                businessLine={businessLine}
+                tasks={kanban.tasks.filter(t => t.projectId === selectedProjectId)}
+                kanbanApi={kanban}
+                onSelectClient={handleSelectClient}
+                onSelectTask={handleSelectTask}
+                onBack={() => handleSetView('projects')}
+            />
+        }
+    }
     if (selectedDealId) {
         const deal = kanban.deals.find(d => d.id === selectedDealId);
         if (deal) {
@@ -220,11 +285,13 @@ export default function App() {
                 businessLines={kanban.businessLines}
                 tasks={kanban.tasks.filter(t => t.clientId === selectedClientId)}
                 deals={kanban.deals.filter(d => d.clientId === selectedClientId)}
+                projects={kanban.projects.filter(p => p.clientId === selectedClientId)}
                 documents={kanban.documents.filter(doc => doc.ownerId === selectedClientId && doc.ownerType === 'client' || kanban.crmEntries.filter(c => c.clientId === client.id).map(c=>c.documentId).includes(doc.id))}
                 crmEntries={kanban.crmEntries.filter(c => c.clientId === selectedClientId)}
                 kanbanApi={kanban}
                 onSelectBusinessLine={handleSelectBusinessLine}
                 onSelectDeal={handleSelectDeal}
+                onSelectProject={handleSelectProject}
                 onSelectTask={handleSelectTask}
                 onBack={() => handleSetView('clients')}
                 onOpenUniversalInput={handleOpenUniversalInput}
@@ -290,6 +357,13 @@ export default function App() {
                     onOpenUniversalInput={handleOpenUniversalInput}
                     onUpdateDeal={kanban.updateDeal}
                 />;
+      case 'projects':
+        return <ProjectsView 
+                    projects={kanban.projects} 
+                    clients={kanban.clients}
+                    onSelectProject={handleSelectProject}
+                    onOpenUniversalInput={handleOpenUniversalInput}
+                />;
       case 'homepage':
       default:
         return <TasksView 
@@ -297,10 +371,12 @@ export default function App() {
             businessLines={kanban.businessLines}
             clients={kanban.clients}
             deals={kanban.deals}
+            projects={kanban.projects}
             updateTaskStatus={kanban.updateTaskStatusById} 
             onSelectBusinessLine={handleSelectBusinessLine}
             onSelectClient={handleSelectClient}
             onSelectDeal={handleSelectDeal}
+            onSelectProject={handleSelectProject}
             onSelectTask={handleSelectTask}
             onOpenUniversalInput={handleOpenUniversalInput}
             kanbanApi={kanban}
@@ -310,9 +386,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen font-sans flex flex-col lg:flex-row bg-brevo-light-gray">
+      {showWalkthrough && <Walkthrough onComplete={handleWalkthroughComplete} />}
       <Sidebar activeView={activeView} setActiveView={handleSetView} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col">
         <header className="p-4 border-b border-brevo-border flex items-center justify-between z-10 bg-white/80 backdrop-blur-sm sticky top-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="lg:hidden text-brevo-text-secondary hover:text-brevo-text-primary">
@@ -369,7 +446,13 @@ export default function App() {
           <UniversalInputModal 
             isOpen={isUniversalInputOpen}
             onClose={() => setIsUniversalInputOpen(false)}
-            onSave={(text) => kanban.processTextAndExecute(text, universalInputContext)}
+            onSave={(text) => {
+                if (universalInputContext.date) {
+                    kanban.addTask({ title: text, dueDate: universalInputContext.date.toISOString() });
+                } else {
+                    kanban.processTextAndExecute(text, universalInputContext)
+                }
+            }}
             context={universalInputContext}
           />
       )}

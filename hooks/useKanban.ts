@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, PlatformInsight, FilterOptions, GeminiType } from '../types';
-import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries } from '../data/mockData';
+import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, FilterOptions, GeminiType, PlatformInsight, Project, TeamMember } from '../types';
+import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries, initialProjects, initialTeamMembers } from '../data/mockData';
 import { getAiInstance } from '../config/geminiConfig';
 import { processTextMessage } from '../services/routerBrainService';
 import { trackEvent } from '../App';
@@ -10,10 +10,15 @@ export const useKanban = () => {
   const [businessLines, setBusinessLines] = useState<BusinessLine[]>(initialBusinessLines);
   const [clients, setClients] = useState<Client[]>(initialClients);
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
   const [playbooks, setPlaybooks] = useState<Playbook[]>(initialPlaybooks);
   const [crmEntries, setCrmEntries] = useState<CRMEntry[]>(initialCRMEntries);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
 
+  /**
+   * Adds a document to the system.
+   */
   const addDocument = useCallback((file: File | {name: string, content: string}, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string): Document => {
     
     let url = '#';
@@ -64,13 +69,8 @@ ${task.description ? `- Task Details: "${task.description}"` : ''}
 
 **Your Mandate:**
 1.  **Analyze the Goal:** Deeply understand the primary task's objective within the provided business context.
-2.  **Create a Workflow:** The sub-tasks must be sequential steps. The first sub-task should be the logical starting point, and the last should lead to the completion of the primary task.
+2.  **Create a Workflow:** The sub-tasks must be sequential steps.
 3.  **Be Specific and Actionable:** Avoid vague sub-tasks. Instead of "Get details", use "Email John Doe to confirm warehouse dimensions".
-4.  **Be Decisive:** The user can edit or delete these later. Provide a complete, ready-to-use checklist.
-
-**Example of High-Quality Output:**
-For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good output is:
-["Review notes from the last call with ABC's facility manager", "Confirm service scope for all three warehouse locations", "Draft the contract using the standard legal template", "Calculate final pricing including the new basement area", "Send the draft contract to Grandma Oloo for final review before sending to client"]
 
 **Your Output (JSON array of strings only):**`;
         
@@ -103,7 +103,7 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
   };
 
 
-  const addTask = useCallback((itemData: Partial<Omit<Task, 'id' | 'status' | 'type'>> & { itemType?: TaskType, title: string, businessLineName?: string }) => {
+  const addTask = useCallback((itemData: Partial<Omit<Task, 'id' | 'status' | 'type' | 'createdAt'>> & { itemType?: TaskType, title: string, businessLineName?: string }) => {
     let businessLineId = itemData.businessLineId;
     if (!businessLineId && itemData.businessLineName) {
         const businessLine = businessLines.find(bl => bl.name.toLowerCase() === itemData.businessLineName?.toLowerCase());
@@ -127,6 +127,7 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
       title: itemData.title,
       status: KanbanStatus.ToDo,
       type: itemData.itemType || TaskType.Task,
+      createdAt: new Date().toISOString(),
       ...itemData,
       businessLineId: businessLineId,
     };
@@ -141,20 +142,29 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
       _addCRMEntryToState({
           clientId: newTask.clientId,
           dealId: newTask.dealId,
+          projectId: newTask.projectId,
           createdAt: new Date().toISOString(),
           type: 'ai_action',
           summary: `AI created task: "${newTask.title}"`,
           rawContent: `AI created task: "${newTask.title}"`
       });
     }
+    if (newTask.assigneeId) {
+        const assignee = teamMembers.find(tm => tm.id === newTask.assigneeId);
+        if (assignee) {
+             // Simulate sending email reminder
+             console.log(`Simulating email to ${assignee.email}: New task assigned - ${newTask.title}`);
+        }
+    }
+
     trackEvent('create', 'Task', newTask.type);
     return `${newTask.type} "${newTask.title}" created successfully.`;
-  }, [businessLines, clients, deals]);
+  }, [businessLines, clients, deals, teamMembers]);
 
   const generateAndAddPlaybook = useCallback(async (businessLine: BusinessLine) => {
     try {
         const ai = getAiInstance();
-        const prompt = `Based on the following business line, generate a standard playbook with 5-7 simple steps from initial contact to a completed job. Return ONLY a valid JSON array of objects, where each object has a "title" and a "description". For example: [{"title": "Step 1", "description": "Details for step 1"}].\n\nName: ${businessLine.name}\nDescription: ${businessLine.description}\nCustomers: ${businessLine.customers}`;
+        const prompt = `Based on the following business line, generate a standard playbook with 5-7 simple steps from initial contact to a completed job. Return ONLY a valid JSON array of objects, where each object has a "title" and a "description".\n\nName: ${businessLine.name}\nDescription: ${businessLine.description}\nCustomers: ${businessLine.customers}`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -186,7 +196,6 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
             businessLineId: businessLine.id,
             steps,
         };
-        // Remove existing playbook if it exists, then add the new one.
         setPlaybooks(prev => [...prev.filter(p => p.businessLineId !== businessLine.id), newPlaybook]);
     } catch (e) {
         console.error("Error generating playbook:", e);
@@ -197,9 +206,21 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
     if (businessLines.some(bl => bl.name.toLowerCase() === data.name.toLowerCase())) {
       return `Business line "${data.name}" already exists.`;
     }
+    
+    let description = data.description;
+    try {
+        const ai = getAiInstance();
+        const prompt = `Refine the following business description into a single, benefit-oriented sentence: "${data.description}". Business Name: ${data.name}. Customers: ${data.customers}. Output only the single sentence.`;
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        description = response.text.trim();
+    } catch (e) {
+        console.error("Error generating business line description:", e);
+    }
+
     const newBusinessLine: BusinessLine = {
       id: `bl-${Date.now()}`,
       ...data,
+      description,
     };
     setBusinessLines(prev => [newBusinessLine, ...prev]);
     await generateAndAddPlaybook(newBusinessLine);
@@ -209,8 +230,25 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
 
   const updateBusinessLine = useCallback((id: string, data: Partial<Omit<BusinessLine, 'id'>>) => {
     setBusinessLines(prev => prev.map(bl => bl.id === id ? { ...bl, ...data } : bl));
-    return `Business line "${data.name}" updated.`;
+    return `Business line updated.`;
   }, []);
+
+  const deleteBusinessLine = useCallback((id: string) => {
+    const clientsToDelete = clients.filter(c => c.businessLineId === id).map(c => c.id);
+    const dealsToDelete = deals.filter(d => d.businessLineId === id).map(d => d.id);
+    
+    setBusinessLines(prev => prev.filter(bl => bl.id !== id));
+    setClients(prev => prev.filter(c => c.businessLineId !== id));
+    setDeals(prev => prev.filter(d => d.businessLineId !== id));
+    setTasks(prev => prev.filter(t => t.businessLineId !== id));
+    setDocuments(prev => {
+        const ownersToDelete = new Set([id, ...clientsToDelete, ...dealsToDelete]);
+        return prev.filter(doc => !ownersToDelete.has(doc.ownerId));
+    });
+    setCrmEntries(prev => prev.filter(e => !clientsToDelete.includes(e.clientId)));
+    
+    return `Business line and all related items deleted.`;
+}, [clients, deals]);
   
   const updatePlaybook = useCallback((playbookId: string, updatedSteps: PlaybookStep[]) => {
       setPlaybooks(prev => prev.map(p => p.id === playbookId ? { ...p, steps: updatedSteps } : p));
@@ -232,7 +270,7 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
     }
 
     if (!businessLine) {
-        if (!businessLines || businessLines.length === 0) {
+        if (businessLines.length === 0) {
             return "To create a client, you first need to set up at least one business line.";
         }
         businessLine = businessLines[0];
@@ -260,8 +298,23 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
 
   const updateClient = useCallback((id: string, data: Partial<Omit<Client, 'id'>>) => {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-    return `Client "${data.name}" updated.`;
+    return `Client updated.`;
   }, []);
+
+  const deleteClient = useCallback((id: string) => {
+    const dealsToDelete = deals.filter(d => d.clientId === id).map(d => d.id);
+    
+    setClients(prev => prev.filter(c => c.id !== id));
+    setDeals(prev => prev.filter(d => d.clientId !== id));
+    setTasks(prev => prev.filter(t => t.clientId !== id));
+    setDocuments(prev => {
+        const ownersToDelete = new Set([id, ...dealsToDelete]);
+        return prev.filter(doc => !ownersToDelete.has(doc.ownerId));
+    });
+    setCrmEntries(prev => prev.filter(e => e.clientId !== id));
+
+    return `Client and all related items deleted.`;
+}, [deals]);
 
   const addDeal = useCallback((data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string, clientId?: string, businessLineId?: string }) => {
     const client = clients.find(c => c.id === data.clientId || c.name.toLowerCase() === data.clientName.toLowerCase());
@@ -301,9 +354,186 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
   }, [deals, clients, playbooks]);
 
   const updateDeal = useCallback((id: string, data: Partial<Omit<Deal, 'id'>>) => {
-      setDeals(prev => prev.map(d => d.id === id ? { ...d, ...data } : d));
+      let originalDeal: Deal | undefined;
+      setDeals(prev => prev.map(d => {
+          if (d.id === id) {
+              originalDeal = d;
+              return { ...d, ...data };
+          }
+          return d;
+      }));
+      
+      if (originalDeal && data.value && originalDeal.value !== data.value) {
+           _addCRMEntryToState({
+                clientId: originalDeal.clientId,
+                dealId: id,
+                createdAt: new Date().toISOString(),
+                type: 'ai_action',
+                summary: `Deal value updated for "${originalDeal.name}" from ${originalDeal.currency} ${originalDeal.value} to ${originalDeal.currency} ${data.value}.`,
+                rawContent: `Deal value updated from ${originalDeal.value} to ${data.value}.`
+            });
+      }
       return `Deal updated.`;
   }, []);
+
+  const deleteDeal = useCallback((id: string) => {
+    setDeals(prev => prev.filter(d => d.id !== id));
+    setTasks(prev => prev.filter(t => t.dealId !== id));
+    setDocuments(prev => prev.filter(doc => doc.ownerId === id && doc.ownerType === 'deal'));
+    setCrmEntries(prev => prev.filter(e => e.dealId === id));
+    
+    return `Deal and all related items deleted.`;
+}, []);
+
+    const addProject = useCallback((data: Partial<Omit<Project, 'id'>> & { partnerName: string; projectName: string; goal: string; }) => {
+        const partnerAsClient = clients.find(c => c.name.toLowerCase() === data.partnerName.toLowerCase());
+        
+        const newProject: Project = {
+            id: `proj-${Date.now()}`,
+            partnerName: data.partnerName,
+            projectName: data.projectName,
+            goal: data.goal,
+            dealType: data.dealType || 'Fee-based',
+            expectedRevenue: data.expectedRevenue || 0,
+            impactMetric: data.impactMetric || 'N/A',
+            stage: data.stage || 'Lead',
+            projectOwner: 'Grandma Oloo',
+            lastTouchDate: new Date().toISOString(),
+            lastTouchSummary: 'Project created by Walter.',
+            nextAction: 'Define initial milestones and schedule kickoff call.',
+            nextActionOwner: 'Grandma Oloo',
+            nextActionDueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString(),
+            opportunityNote: '',
+            clientId: partnerAsClient?.id,
+        };
+        setProjects(prev => [newProject, ...prev]);
+        if (newProject.clientId) {
+            _addCRMEntryToState({
+                clientId: newProject.clientId,
+                projectId: newProject.id,
+                createdAt: new Date().toISOString(),
+                type: 'ai_action',
+                summary: `AI created project: "${newProject.projectName}"`,
+                rawContent: `AI created project: "${newProject.projectName}" with partner ${newProject.partnerName}`,
+            });
+        }
+        trackEvent('create', 'Project', newProject.projectName);
+        return `Project "${newProject.projectName}" created.`;
+    }, [clients]);
+
+    const updateProject = useCallback((id: string, data: Partial<Omit<Project, 'id'>>) => {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+        return `Project updated.`;
+    }, []);
+
+    const updateProjectFromInteraction = useCallback(async (projectId: string, interactionText: string) => {
+        const project = projects.find(p => p.id === projectId);
+        if (!project) return;
+
+        try {
+            const ai = getAiInstance();
+            const prompt = `You are Walter, an AI project assistant. A new interaction has been logged for a project. Your job is to analyze it and propose updates.
+
+**Project Context:**
+- Partner: ${project.partnerName}
+- Project: ${project.projectName}
+- Current Stage: ${project.stage}
+- Goal: ${project.goal}
+- Current Next Action: ${project.nextAction}
+
+**New Interaction Logged:**
+"${interactionText}"
+
+**Your Task:**
+Based on the new interaction, generate a concise "Last touch summary", propose a new "Next action" with a due date, and suggest an updated "Stage" if applicable.
+Return ONLY a valid JSON object with the keys: "lastTouchSummary", "nextAction", "nextActionDueDate", and "stage".
+The stage must be one of: 'Lead', 'In design', 'Live', 'Closing', 'Dormant'.
+The due date should be in ISO 8601 format.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            lastTouchSummary: { type: GeminiType.STRING },
+                            nextAction: { type: GeminiType.STRING },
+                            nextActionDueDate: { type: GeminiType.STRING },
+                            stage: { type: GeminiType.STRING, enum: ['Lead', 'In design', 'Live', 'Closing', 'Dormant'] }
+                        },
+                        required: ['lastTouchSummary', 'nextAction', 'nextActionDueDate', 'stage']
+                    }
+                }
+            });
+            const updates = JSON.parse(response.text.trim());
+
+            setProjects(prev => prev.map(p => p.id === projectId ? {
+                ...p,
+                proposedLastTouchSummary: updates.lastTouchSummary,
+                proposedNextAction: updates.nextAction,
+                proposedNextActionDueDate: updates.nextActionDueDate,
+                proposedStage: updates.stage
+            } : p));
+
+        } catch (e) {
+            console.error("Error updating project from interaction:", e);
+        }
+    }, [projects]);
+    
+    const approveProjectUpdate = useCallback((projectId: string) => {
+        const project = projects.find(p => p.id === projectId);
+        if (!project || !project.proposedLastTouchSummary) return;
+
+        const newCRMEntrySummary = `Interaction logged for "${project.projectName}": ${project.proposedLastTouchSummary}`;
+        
+        setProjects(prev => prev.map(p => {
+            if (p.id === projectId) {
+                return {
+                    ...p,
+                    lastTouchDate: new Date().toISOString(),
+                    lastTouchSummary: p.proposedLastTouchSummary || p.lastTouchSummary,
+                    nextAction: p.proposedNextAction || p.nextAction,
+                    nextActionDueDate: p.proposedNextActionDueDate || p.nextActionDueDate,
+                    stage: p.proposedStage || p.stage,
+                    proposedLastTouchSummary: undefined,
+                    proposedNextAction: undefined,
+                    proposedNextActionDueDate: undefined,
+                    proposedStage: undefined,
+                };
+            }
+            return p;
+        }));
+
+        if (project.clientId) {
+            _addCRMEntryToState({
+                clientId: project.clientId,
+                projectId: project.id,
+                createdAt: new Date().toISOString(),
+                type: 'note',
+                summary: newCRMEntrySummary,
+                rawContent: project.proposedLastTouchSummary!,
+            });
+        }
+
+    }, [projects]);
+    
+    const clearProposedProjectUpdate = useCallback((projectId: string) => {
+        setProjects(prev => prev.map(p => p.id === projectId ? {
+             ...p,
+             proposedLastTouchSummary: undefined,
+             proposedNextAction: undefined,
+             proposedNextActionDueDate: undefined,
+             proposedStage: undefined,
+        } : p));
+    }, []);
+
+    const deleteProject = useCallback((id: string) => {
+        setProjects(prev => prev.filter(p => p.id !== id));
+        setTasks(prev => prev.filter(t => t.projectId !== id));
+        return `Project and related tasks deleted.`;
+    }, []);
   
   const addCRMEntryFromVoice = useCallback((data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => {
     if (!data.clientName) {
@@ -323,7 +553,7 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
         dealId: dealId,
         createdAt: new Date().toISOString(),
         type: data.interactionType,
-        summary: data.content, // Voice assistant should provide a good summary
+        summary: data.content,
         rawContent: data.content,
     });
     return `Note added to ${client.name}'s timeline.`;
@@ -355,23 +585,20 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
         const lastCRMEntry = crmEntries.filter(c => c.clientId === task.clientId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
         const dealDocuments = documents.filter(doc => doc.ownerId === deal?.id).map(d => d.name).join(', ');
 
-        let prompt = `A task was just completed. Based on all the context, suggest 1-2 concrete, actionable next-step tasks. Use your vast knowledge of business processes if no playbook is available.
+        let prompt = `A task was just completed. Based on all the context, suggest 1-2 concrete, actionable next-step tasks.
         Return ONLY a valid JSON array of objects, where each object has a "text" (the suggestion for the user) and a "taskTitle" (the title for the new task).
         
         CONTEXT:
         - Completed Task: "${task.title}"
         ${client ? `- Client: "${client.name}"` : ''}
-        ${deal ? `- Deal: "${deal.name}" (${deal.description})` : ''}
-        - Last conversation with client: ${lastCRMEntry ? `"${lastCRMEntry.summary}"` : "None recorded."}
-        - Relevant documents for this deal: ${dealDocuments || 'None'}
+        ${deal ? `- Deal: "${deal.name}"` : ''}
+        - Last conversation: ${lastCRMEntry ? `"${lastCRMEntry.summary}"` : "None."}
         `;
 
         if (nextStep) {
-            prompt += `- The next step in our standard process is: "${nextStep.title}" (${nextStep.description}). Base your suggestions on this step.`
-        } else if (playbook) {
-            prompt += `- This task wasn't part of our standard playbook. Use your own reasoning to figure out the best next step to move the deal forward.`
+            prompt += `- Next standard step: "${nextStep.title}"`
         } else {
-            prompt += `- There is no standard playbook. Use your vast knowledge of business processes to figure out the best next step.`
+            prompt += `- No standard playbook. Use your best judgment.`
         }
         
         const response = await ai.models.generateContent({ 
@@ -484,7 +711,6 @@ For a task "Prepare Q3 Fumigation Contract" for client "ABC Logistics", a good o
     try {
         const ai = getAiInstance();
         const prompt = `You are a top-tier business strategist. Analyze the following business line, perform a deep web search for market trends and news, and generate 3 highly specific and creative business opportunities. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
-Example: ["Partner with local real estate agencies for a 'new tenant welcome package', as recent articles show a boom in rental property occupancy."]
 
 Business Line Information:
 Name: ${businessLine.name}
@@ -518,7 +744,7 @@ AI Focus: ${businessLine.aiFocus}`;
     try {
         const businessLine = businessLines.find(bl => bl.id === client.businessLineId);
         const ai = getAiInstance();
-        const prompt = `You are a top-tier business strategist. Analyze the following client, perform a deep web search for news and trends related to them, and generate 3 simple, actionable opportunities to grow the business relationship. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
+        const prompt = `You are a top-tier business strategist. Analyze the following client, perform a deep web search for news and trends related to them, and generate 3 simple, actionable opportunities to grow the business relationship. Return ONLY a valid JSON array of strings.
 Client Name: ${client.name}
 Description: ${client.description}
 Business Line: ${businessLine?.name}
@@ -549,7 +775,7 @@ AI Focus: ${client.aiFocus}`;
         const client = clients.find(c => c.id === deal.clientId);
         const businessLine = businessLines.find(bl => bl.id === deal.businessLineId);
         const ai = getAiInstance();
-        const prompt = `You are a top-tier business strategist. Based on the following deal, perform a deep web search for industry trends, and generate 3 simple, actionable next steps or upsell opportunities. For each, explain *why* it's a good idea based on your research. ${expand ? 'Provide new and different ideas from the last time.' : ''} Return ONLY a valid JSON array of strings.
+        const prompt = `You are a top-tier business strategist. Based on the following deal, perform a deep web search for industry trends, and generate 3 simple, actionable next steps or upsell opportunities. Return ONLY a valid JSON array of strings.
 Deal Name: ${deal.name}
 Description: ${deal.description}
 Status: ${deal.status}
@@ -581,24 +807,52 @@ Business Line: ${businessLine?.name}`;
   const generateDocumentDraft = useCallback(async (prompt: string, category: DocumentCategory, owner: BusinessLine | Client | Deal, ownerType: DocumentOwnerType): Promise<string> => {
     try {
         const ai = getAiInstance();
-        const fullPrompt = `You are an expert business document writer. Generate a professional draft for a "${category}" document for a ${ownerType} named "${owner.name}". The user's request is: "${prompt}". Provide only the draft text, without any introductory phrases like "Here is the draft:".`;
+        let fullPrompt = `You are an expert business document writer. Generate a professional draft for a "${category}" document for a ${ownerType} named "${owner.name}". The user's request is: "${prompt}". Provide only the draft text, without any introductory phrases.`;
+
+        if (ownerType === 'client') {
+            const client = owner as Client;
+            const businessLine = businessLines.find(bl => bl.id === client.businessLineId);
+            fullPrompt = `You are an expert business document writer. Generate a professional draft for a "${category}" document.
+            
+            **CRITICAL CONTEXT:**
+            - Client: "${client.name}" (${client.description})
+            - Business Line: "${businessLine?.name || 'General'}"
+            - Our strategic focus with this client: "${client.aiFocus}"
+
+            **User's Request:** "${prompt}"
+
+            Use all the context to create a highly tailored and relevant document. Provide only the draft text.`;
+        }
+        
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: fullPrompt });
         return response.text.trim();
     } catch (e) {
         console.error("Error generating document draft:", e);
         return "Sorry, I encountered an error while drafting the document. Please try again.";
     }
-  }, []);
+  }, [businessLines]);
 
-  const generateMarketingCollateralPrompt = useCallback(async (prompt: string, collateralType: string, owner: BusinessLine | Client | Deal): Promise<string> => {
+  const generateMarketingCollateralContent = useCallback(async (prompt: string, collateralType: string, owner: BusinessLine | Client | Deal): Promise<string> => {
     try {
         const ai = getAiInstance();
-        const fullPrompt = `You are an expert marketing assistant. Generate a creative prompt for a "${collateralType}" about "${owner.name}". The user's goal is: "${prompt}". The prompt should be something they can copy and paste into another AI tool (like an image generator or video creator). Provide only the creative prompt itself, without any introductory phrases. Make it descriptive and inspiring.`;
+        const fullPrompt = `You are an expert marketing copywriter. Generate the content for a "${collateralType}" about "${owner.name}". The user's goal is: "${prompt}". Provide only the generated content, ready to be used.`;
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: fullPrompt });
         return response.text.trim();
     } catch (e) {
-        console.error("Error generating marketing collateral prompt:", e);
-        return "Sorry, I encountered an error while generating the marketing idea. Please try again.";
+        console.error("Error generating marketing collateral content:", e);
+        return "Sorry, I encountered an error while generating the content. Please try again.";
+    }
+  }, []);
+  
+  const enhanceUserPrompt = useCallback(async (prompt: string): Promise<string> => {
+    try {
+      const ai = getAiInstance();
+      const fullPrompt = `You are an expert prompt engineer. Enhance the following user prompt to generate better marketing content. Make it more descriptive, creative, and specific. User prompt: "${prompt}". Your output must be only the enhanced prompt text.`;
+      const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: fullPrompt });
+      return response.text.trim();
+    } catch(e) {
+      console.error("Error enhancing prompt:", e);
+      return prompt;
     }
   }, []);
 
@@ -634,7 +888,7 @@ Business Line: ${businessLine?.name}`;
   const findProspects = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<{ prospects: Prospect[], sources: any[] }> => {
     try {
       const ai = getAiInstance();
-      const prompt = customPrompt || `You are a business development expert. Based on my business line "${businessLine.name}" (${businessLine.description}), perform a deep web search to find 5 potential new clients. For each, provide a name and a likely need, explaining your reasoning. Return ONLY a valid JSON array of objects, where each object has "name" and "likelyNeed".`;
+      const prompt = customPrompt || `You are a business development expert. Based on my business line "${businessLine.name}" (${businessLine.description}), perform a deep web search to find 5 potential new clients. For each, provide a name and a likely need. Return ONLY a valid JSON array of objects, where each object has "name" and "likelyNeed".`;
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
         contents: prompt,
@@ -664,31 +918,94 @@ Business Line: ${businessLine?.name}`;
             return `I couldn't find any new prospects for "${businessLineName}" right now.`;
         }
         const prospectNames = prospects.map(p => p.name).join(', ');
-        return `Based on my research, I found a few prospects for ${businessLineName}: ${prospectNames}. You can see the full list in the Prospects tab.`;
+        return `Based on my research, I found a few prospects for ${businessLineName}: ${prospectNames}.`;
     } catch (e) {
         console.error("Error finding prospects by name:", e);
-        return `Sorry, I had trouble searching for prospects for "${businessLineName}". Please try again from the Prospects tab.`;
+        return `Sorry, I had trouble searching for prospects for "${businessLineName}".`;
     }
   }, [businessLines, findProspects]);
 
+  const generateNextTaskFromSubtask = useCallback(async (task: Task, completedSubtaskText: string) => {
+    try {
+        const ai = getAiInstance();
+        const client = clients.find(c => c.id === task.clientId);
+        const deal = deals.find(d => d.id === task.dealId);
+        
+        const prompt = `A sub-task was just completed. Based on the context, suggest the single most logical next task to continue the workflow.
+        
+        **Context:**
+        - Main Task: "${task.title}"
+        - Completed Sub-task: "${completedSubtaskText}"
+        - Client: ${client?.name || 'N/A'}
+        - Deal: ${deal?.name || 'N/A'}
+
+        Your response MUST BE a valid JSON object. It must contain a single key, "taskTitle". If no obvious next task is needed, the value MUST be null.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: GeminiType.OBJECT,
+                    properties: {
+                        taskTitle: { type: GeminiType.STRING, nullable: true }
+                    },
+                    required: ["taskTitle"],
+                }
+            }
+        });
+        const result = JSON.parse(response.text.trim());
+        if (result.taskTitle) {
+            addTask({
+                title: result.taskTitle,
+                description: `Generated after completing sub-task: "${completedSubtaskText}"`,
+                clientId: task.clientId,
+                dealId: task.dealId,
+                businessLineId: task.businessLineId,
+            });
+        }
+    } catch (e) {
+        console.error("Error generating next task from subtask:", e);
+    }
+  }, [clients, deals, addTask]);
+
   const toggleSubTask = useCallback((taskId: string, subTaskId: string) => {
-    setTasks(prev => prev.map(task => {
-      if (task.id === taskId && task.subTasks) {
-        return {
-          ...task,
-          subTasks: task.subTasks.map(sub => 
-            sub.id === subTaskId ? { ...sub, isDone: !sub.isDone } : sub
-          )
-        };
-      }
-      return task;
+    let completedSubTask: { id: string, text: string, isDone: boolean} | undefined;
+    let task: Task | undefined;
+    let newSubTasks: Task['subTasks'] | undefined;
+
+    setTasks(prev => prev.map(t => {
+        if (t.id === taskId) {
+            task = t;
+            newSubTasks = t.subTasks?.map(sub => {
+                if (sub.id === subTaskId) {
+                    completedSubTask = { ...sub, isDone: !sub.isDone };
+                    return completedSubTask;
+                }
+                return sub;
+            });
+            return { ...t, subTasks: newSubTasks };
+        }
+        return t;
     }));
-  }, []);
+    
+    if (task && completedSubTask && completedSubTask.isDone) {
+        generateNextTaskFromSubtask(task, completedSubTask.text);
+    }
+    
+    if (task && newSubTasks) {
+        const allDone = newSubTasks.every(s => s.isDone);
+        if (allDone && task.status !== KanbanStatus.Done) {
+            updateTaskStatusById(taskId, KanbanStatus.Done);
+        }
+    }
+}, [generateNextTaskFromSubtask, updateTaskStatusById]);
 
   const generateSocialMediaIdeas = useCallback(async (businessLine: BusinessLine, customPrompt?: string): Promise<string[]> => {
     try {
         const ai = getAiInstance();
-        const prompt = customPrompt || `Based on my business line "${businessLine.name}" and recent online trends, generate 5 timely social media post ideas. State that this is based on your knowledge and external research. Return ONLY a valid JSON array of strings.`;
+        const prompt = customPrompt || `Based on my business line "${businessLine.name}" and recent online trends, generate 5 timely social media post ideas. Return ONLY a valid JSON array of strings.`;
         const response = await ai.models.generateContent({ 
             model: 'gemini-2.5-flash', 
             contents: prompt,
@@ -783,7 +1100,7 @@ Business Line: ${businessLine?.name}`;
   const getClientPulse = useCallback(async (client: Client, filters: FilterOptions, customPrompt?: string): Promise<ClientPulse[]> => {
     try {
         const ai = getAiInstance();
-        const prompt = customPrompt || `Based on external research, find recent public social media posts or news articles mentioning "${client.name}". Apply the following filters: ${JSON.stringify(filters)}. For each result, provide the source, content snippet, a URL, and a date. Return ONLY a valid JSON array of objects with keys: "source", "content", "url", "date".`;
+        const prompt = customPrompt || `My strategic focus with client "${client.name}" (${client.description}) is: "${client.aiFocus}". Search the web for recent news, articles, or social media posts related to this strategic focus. Return ONLY a valid JSON array of objects with keys: "source", "content", "url", "date".`;
         const response = await ai.models.generateContent({ 
             model: 'gemini-2.5-flash', 
             contents: prompt,
@@ -816,10 +1133,7 @@ Business Line: ${businessLine?.name}`;
   const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: FilterOptions, customPrompt?: string): Promise<{ insights: CompetitorInsight[], trends: SearchTrend[] }> => {
     try {
         const ai = getAiInstance();
-        const prompt = customPrompt || `For a business in "${businessLine.name}", perform a deep search online. Apply these filters: ${JSON.stringify(filters)}.
-        1. Identify 2-3 key competitors and provide a recent insight for each.
-        2. Identify 2-3 recent customer search trends related to this business.
-        Return ONLY a valid JSON object with two keys: "insights" (an array of objects with "competitorName", "insight", "source") and "trends" (an array of objects with "keyword", "insight").`;
+        const prompt = customPrompt || `For a business in "${businessLine.name}", perform a deep search online. Return ONLY a valid JSON object with two keys: "insights" (an array of objects with "competitorName", "insight", "source") and "trends" (an array of objects with "keyword", "insight").`;
         const response = await ai.models.generateContent({ 
             model: 'gemini-2.5-flash', 
             contents: prompt,
@@ -874,24 +1188,27 @@ Business Line: ${businessLine?.name}`;
         const prompt = `Based on the task "${task.title}", generate the content for the following sub-task: "${subtaskText}". Return only the document content.`;
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
         const content = response.text.trim();
-        const docName = `${subtaskText}.gdoc`; // Mock Google Doc
+        const docName = `${subtaskText}.gdoc`;
         
-        let ownerId = task.dealId || task.clientId || task.businessLineId;
-        let ownerType: DocumentOwnerType = task.dealId ? 'deal' : (task.clientId ? 'client' : 'businessLine');
+        let ownerId = task.dealId || task.clientId || task.businessLineId || task.projectId;
+        let ownerType: DocumentOwnerType = task.dealId ? 'deal' : (task.projectId ? 'project' : (task.clientId ? 'client' : 'businessLine'));
 
-        if (!ownerId) return null; // Can't create a doc without an owner
+        if (!ownerId) return null; 
 
         const newDoc = addDocument({ name: docName, content }, 'Templates', ownerId, ownerType);
 
-        _addCRMEntryToState({
-            clientId: task.clientId!,
-            dealId: task.dealId,
-            createdAt: new Date().toISOString(),
-            type: 'ai_action',
-            summary: `AI generated document: "${docName}" for task "${task.title}"`,
-            rawContent: `AI generated document from subtask: "${subtaskText}"`,
-            documentId: newDoc.id,
-        });
+        if (task.clientId) {
+          _addCRMEntryToState({
+              clientId: task.clientId,
+              dealId: task.dealId,
+              projectId: task.projectId,
+              createdAt: new Date().toISOString(),
+              type: 'ai_action',
+              summary: `AI generated document: "${docName}" for task "${task.title}"`,
+              rawContent: `AI generated document from subtask: "${subtaskText}"`,
+              documentId: newDoc.id,
+          });
+        }
 
         return newDoc;
     } catch (e) {
@@ -901,31 +1218,270 @@ Business Line: ${businessLine?.name}`;
   }, [addDocument]);
   
   const getPlatformInsights = useCallback((): PlatformInsight[] => {
-    // This is a mock function. In a real app, this would query a database
-    // or an analytics service where AI-derived insights are stored.
-    return [
-      { id: 'pi-1', text: "You're most productive on Tuesday mornings. 75% of your 'Done' tasks last week were completed then." },
-      { id: 'pi-2', text: "The 'Fumigation' business line has the fastest deal-closing time, averaging 8 days from creation to 'Closed-Won'." },
-      { id: 'pi-3', text: "You haven't logged a conversation with 'Bright Schools' in over 2 weeks. It might be time to follow up." },
-    ];
+    const insights: PlatformInsight[] = [];
+    if (tasks.filter(t => t.status === KanbanStatus.Done).length > 5) {
+      insights.push({ id: 'insight-1', text: "You've completed several tasks recently. Consider archiving old 'Done' items to keep your board clean." });
+    }
+    if (deals.filter(d => d.status === 'Open').length > 3) {
+      insights.push({ id: 'insight-2', text: "You have multiple open deals. Prioritize follow-ups on the highest value deals to maximize revenue." });
+    }
+    if (crmEntries.length > 10) {
+        insights.push({ id: 'insight-3', text: 'You are actively logging CRM entries. Great job keeping your client communication up to date!' });
+    }
+    if (insights.length === 0) {
+        insights.push({ id: 'insight-4', text: 'Keep interacting with the platform to receive personalized insights on your workflow.' });
+    }
+    return insights.slice(0, 2);
+  }, [tasks, deals, crmEntries]);
+
+  const updateTask = useCallback((taskId: string, data: Partial<Omit<Task, 'id' | 'createdAt'>>) => {
+    let originalTask: Task | undefined;
+    let updatedTask: Task | undefined;
+    setTasks(prev => prev.map(t => {
+        if (t.id === taskId) {
+            originalTask = t;
+            updatedTask = { ...t, ...data };
+            return updatedTask;
+        }
+        return t;
+    }));
+    
+    if (originalTask && updatedTask) {
+        if (data.clientId && originalTask.clientId !== data.clientId) {
+            _addCRMEntryToState({
+                clientId: data.clientId,
+                dealId: updatedTask.dealId,
+                projectId: updatedTask.projectId,
+                createdAt: new Date().toISOString(),
+                type: 'ai_action',
+                summary: `Task "${updatedTask.title}" was associated with this client.`,
+                rawContent: `Task updated: ${JSON.stringify(data)}`
+            });
+        }
+        if (data.assigneeId && originalTask.assigneeId !== data.assigneeId) {
+            const assignee = teamMembers.find(tm => tm.id === data.assigneeId);
+            if (assignee) {
+                 // Simulate email notification
+                 console.log(`Simulating email to ${assignee.email}: You have been assigned to task "${updatedTask.title}"`);
+            }
+        }
+    }
+    
+    return `Task "${data.title}" updated.`;
+  }, [teamMembers]);
+
+  const promoteSubtaskToTask = useCallback((taskId: string, subTaskId: string) => {
+    const parentTask = tasks.find(t => t.id === taskId);
+    const subTask = parentTask?.subTasks?.find(st => st.id === subTaskId);
+
+    if (parentTask && subTask) {
+        addTask({
+            title: subTask.text,
+            description: `Promoted from sub-task of "${parentTask.title}"`,
+            clientId: parentTask.clientId,
+            dealId: parentTask.dealId,
+            projectId: parentTask.projectId,
+            businessLineId: parentTask.businessLineId,
+        });
+
+        const newSubTasks = parentTask.subTasks?.filter(st => st.id !== subTaskId);
+        setTasks(prev => prev.map(t => 
+            t.id === taskId ? { ...t, subTasks: newSubTasks } : t
+        ));
+    }
+  }, [tasks, addTask]);
+
+  const researchSubtask = useCallback(async (subtaskText: string, taskContext: string): Promise<string> => {
+    try {
+        const ai = getAiInstance();
+        const prompt = `Perform a concise web search and provide a summary for the following research task.
+        Task: "${subtaskText}"
+        Context: "${taskContext}"
+        
+        Provide a brief, direct summary of your findings.`;
+
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-pro', 
+            contents: prompt,
+            config: {
+                tools: [{googleSearch: {}}],
+            }
+        });
+        return response.text.trim();
+    } catch (e) {
+        console.error("Error researching subtask:", e);
+        return "Sorry, I couldn't complete the research. Please try again.";
+    }
   }, []);
+
+  const refineTaskChecklist = useCallback(async (taskId: string, command: string) => {
+    try {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task || !task.subTasks) return;
+
+        const ai = getAiInstance();
+        const client = clients.find(c => c.id === task.clientId);
+        const deal = deals.find(d => d.id === task.dealId);
+        const currentSubTaskTexts = task.subTasks.map(st => st.text);
+
+        const prompt = `You are an expert project manager AI. Your job is to intelligently modify a task's checklist based on a user's command.
+**CRITICAL CONTEXT:**
+- Task Title: "${task.title}"
+- Client: ${client?.name || 'N/A'}
+- Deal: ${deal?.name || 'N/A'}
+**CURRENT CHECKLIST:**
+${JSON.stringify(currentSubTaskTexts, null, 2)}
+**USER'S COMMAND:**
+"${command}"
+**Your Output (JSON array of strings only):**`;
+        
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: GeminiType.ARRAY,
+                    items: { type: GeminiType.STRING }
+                }
+            }
+        });
+        const newSubTaskTexts: string[] = JSON.parse(response.text.trim());
+        
+        const newSubTasks = newSubTaskTexts.map((text, index) => {
+            const existing = task.subTasks?.find(st => st.text === text);
+            return {
+                id: existing?.id || `sub-${task.id}-${Date.now()}-${index}`,
+                text,
+                isDone: existing?.isDone || false,
+            };
+        });
+
+        setTasks(prev => prev.map(t => 
+            t.id === taskId ? { ...t, subTasks: newSubTasks } : t
+        ));
+
+    } catch (e) {
+        console.error("Error refining checklist:", e);
+    }
+  }, [tasks, clients, deals]);
+
+  const getPlatformQueryResponse = useCallback(async (query: string): Promise<string> => {
+      try {
+        const ai = getAiInstance();
+        const today = new Date();
+        
+        let context = `Today's date is ${today.toDateString()}.
+        Open Tasks: ${tasks.filter(t => t.status !== 'Done' && t.status !== 'Terminated').map(t => t.title).join(', ') || 'None'}.
+        Open Deals: ${deals.filter(d => d.status === 'Open').map(d => `${d.name} for ${clients.find(c => c.id === d.clientId)?.name}`).join(', ') || 'None'}.
+        `;
+
+        if (query.toLowerCase().includes('project')) {
+            const projectsMoved = projects.filter(p => new Date(p.lastTouchDate) > new Date(today.setDate(today.getDate() - 7)));
+            const projectsStuck = projects.filter(p => new Date(p.nextActionDueDate) < new Date() && p.stage !== 'Dormant');
+
+            context += `
+            All Projects:
+            ${projects.map(p => `- ${p.projectName} with ${p.partnerName}, Stage: ${p.stage}, Next Action: ${p.nextAction} due ${p.nextActionDueDate}`).join('\n')}
+            Projects updated this week: ${projectsMoved.map(p => p.projectName).join(', ') || 'None'}.
+            Stuck projects (overdue next action): ${projectsStuck.map(p => p.projectName).join(', ') || 'None'}.
+            `;
+        }
+
+        const prompt = `You are Walter, an AI business assistant. Answer the user's query based on the context provided.
+        Context:
+        ${context}
+
+        User's Query: "${query}"`;
+
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+        return response.text.trim();
+
+      } catch (e) {
+          console.error("Error with platform query:", e);
+          return "I'm sorry, I had trouble analyzing your data. Please try asking again.";
+      }
+  }, [tasks, deals, clients, crmEntries, projects]);
+
+  const logEmailToCRM = useCallback((clientId: string, dealId: string | undefined, subject: string, body: string) => {
+      _addCRMEntryToState({
+          clientId,
+          dealId,
+          createdAt: new Date().toISOString(),
+          type: 'email',
+          summary: `Email sent: "${subject}"`,
+          rawContent: body,
+      });
+  }, []);
+
+  const inviteMember = useCallback((email: string, role: any) => {
+      const newMember: TeamMember = {
+          id: `team-${Date.now()}`,
+          name: email.split('@')[0], // Simple name derivation
+          email,
+          role,
+          status: 'Invited'
+      };
+      setTeamMembers(prev => [...prev, newMember]);
+      // Simulate sending invite email
+      console.log(`Simulating invite email to ${email}`);
+  }, []);
+
+  const generateMeetingTranscript = useCallback(async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if(!task) return;
+    
+    try {
+        const ai = getAiInstance();
+        const prompt = `Simulate a brief meeting transcript for a meeting about "${task.title}". Include 3 key bullet points discussed. Return ONLY the transcript text.`;
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        const transcript = response.text.trim();
+
+        if (task.clientId) {
+             _addCRMEntryToState({
+                clientId: task.clientId,
+                dealId: task.dealId,
+                projectId: task.projectId,
+                createdAt: new Date().toISOString(),
+                type: 'meeting',
+                summary: `Meeting Transcript for "${task.title}"`,
+                rawContent: transcript
+             });
+        }
+        return transcript;
+    } catch(e) {
+        console.error("Error generating transcript", e);
+    }
+  }, [tasks]);
 
   return { 
     tasks, 
     businessLines,
     clients,
     deals,
+    projects,
     documents,
     playbooks,
     crmEntries,
+    teamMembers,
     addTask,
+    updateTask,
     addBusinessLine,
     updateBusinessLine,
+    deleteBusinessLine,
     updatePlaybook,
     addClient,
     updateClient,
+    deleteClient,
     addDeal,
     updateDeal,
+    deleteDeal,
+    addProject,
+    updateProject,
+    deleteProject,
+    updateProjectFromInteraction,
+    approveProjectUpdate,
+    clearProposedProjectUpdate,
     addCRMEntryFromVoice,
     updateTaskStatusById, 
     updateTaskStatusByTitle,
@@ -936,7 +1492,8 @@ Business Line: ${businessLine?.name}`;
     addDocument,
     deleteDocument,
     generateDocumentDraft,
-    generateMarketingCollateralPrompt,
+    generateMarketingCollateralContent,
+    enhanceUserPrompt,
     logPaymentOnDeal,
     findProspects,
     findProspectsByName,
@@ -948,5 +1505,12 @@ Business Line: ${businessLine?.name}`;
     getCompetitorInsights,
     generateDocumentFromSubtask,
     getPlatformInsights,
+    promoteSubtaskToTask,
+    researchSubtask,
+    refineTaskChecklist,
+    getPlatformQueryResponse,
+    logEmailToCRM,
+    inviteMember,
+    generateMeetingTranscript,
   };
 };

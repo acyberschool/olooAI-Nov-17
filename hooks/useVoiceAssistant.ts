@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { connectToLiveSession, decode, decodeAudioData, createPcmBlob } from '../services/geminiService';
-import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType } from '../types';
+import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType, Project } from '../types';
 
 type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
@@ -11,9 +11,11 @@ interface UseVoiceAssistantProps {
   onBusinessLineCreate: (data: Omit<BusinessLine, 'id'>) => Promise<string> | string;
   onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => string;
   onDealCreate: (data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string; clientId?: string; businessLineId?: string;}) => string;
+  onProjectCreate?: (data: Partial<Omit<Project, 'id'>> & { partnerName: string; projectName: string; goal: string; }) => string;
   onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed - Won' | 'Closed - Lost') => string;
   onTurnComplete?: (userTranscript: string, assistantTranscript: string) => void;
   onFindProspects?: (data: { businessLineName: string }) => Promise<string>;
+  onPlatformQuery?: (query: string) => Promise<string>;
   currentBusinessLineId?: string | null;
   currentClientId?: string | null;
   currentDealId?: string | null;
@@ -27,9 +29,11 @@ export const useVoiceAssistant = ({
   onBusinessLineCreate, 
   onClientCreate, 
   onDealCreate,
+  onProjectCreate,
   onDealStatusUpdate,
   onTurnComplete,
   onFindProspects,
+  onPlatformQuery,
   currentBusinessLineId,
   currentClientId,
   currentDealId,
@@ -50,6 +54,7 @@ export const useVoiceAssistant = ({
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef(0);
   const audioSourcesRef = useRef(new Set<AudioBufferSourceNode>());
+  const retryCountRef = useRef(0);
   
   const userTranscriptRef = useRef('');
   const assistantTranscriptRef = useRef('');
@@ -85,6 +90,7 @@ export const useVoiceAssistant = ({
 
   const handleMessage = async (message: any) => {
     setError(null);
+    retryCountRef.current = 0; // Reset retry count on successful message
 
     if (message.serverContent?.inputTranscription) {
         setUserTranscript((prev) => {
@@ -116,11 +122,11 @@ export const useVoiceAssistant = ({
                 finalArgs.dealId = currentDealId;
             }
         } else if (currentClientId) {
-            if (['createBoardItem', 'createDeal', 'createCrmEntry'].includes(fc.name)) {
+            if (['createBoardItem', 'createDeal', 'createProject', 'createCrmEntry'].includes(fc.name)) {
                 finalArgs.clientId = currentClientId;
             }
         } else if (currentBusinessLineId) {
-            if (['createBoardItem', 'createClient', 'createDeal', 'createCrmEntry', 'findProspects'].includes(fc.name)) {
+            if (['createBoardItem', 'createClient', 'createDeal', 'createProject', 'createCrmEntry', 'findProspects'].includes(fc.name)) {
                 finalArgs.businessLineId = currentBusinessLineId;
             }
         }
@@ -144,6 +150,11 @@ export const useVoiceAssistant = ({
             case 'createDeal':
                 result = onDealCreate(finalArgs as Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string});
                 break;
+            case 'createProject':
+                if (onProjectCreate) {
+                    result = onProjectCreate(finalArgs);
+                }
+                break;
             case 'updateDealStatus':
                 if (currentDealId) { // Should only be called from within a deal
                     result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as 'Open' | 'Closed - Won' | 'Closed - Lost');
@@ -154,6 +165,11 @@ export const useVoiceAssistant = ({
             case 'findProspects':
                 if (onFindProspects) {
                     result = onFindProspects(finalArgs as { businessLineName: string });
+                }
+                break;
+            case 'queryPlatform':
+                if (onPlatformQuery) {
+                    result = onPlatformQuery(finalArgs.query as string);
                 }
                 break;
         }
@@ -168,7 +184,7 @@ export const useVoiceAssistant = ({
       }
     }
 
-    const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
+    const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
     if (audioData && outputAudioContextRef.current) {
       setIsThinking(false);
       setIsSpeaking(true);
@@ -217,51 +233,65 @@ export const useVoiceAssistant = ({
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         nextStartTimeRef.current = 0;
+        retryCountRef.current = 0;
         
         const context = { currentBusinessLineId, currentClientId, currentDealId };
         const systemInstruction = `You are Walter, an AI business assistant. Your single purpose is to execute commands by calling functions. You are a tool, not a conversationalist.
 
-**Core Directives (Non-negotiable):**
-1.  **Execute Immediately**: The moment the user pauses, you MUST execute a function call based on what you have heard. Do not wait for the end of a sentence or for a "goodbye". A pause is your trigger to act.
-2.  **ZERO Clarification**: NEVER ask for confirmation. NEVER ask clarifying questions. Use the available context (current view, known entities) to make an executive decision and act on it. If the user meant something else, they will correct you later. Your job is to be fast and decisive, not perfect.
-3.  **Aggressive Contextual Linking**: The user's current view (e.g., a specific client or deal page) is your primary context. ALL new items (tasks, notes, etc.) MUST be linked to this context unless the user explicitly names a different entity.
-4.  **Brevity in Response**: Your voice responses must be confirmations of actions taken, and nothing more. Use terse phrases like: "Task created.", "Note logged.", "Done." Do not add conversational filler.
-5.  **Action vs. Log**: Differentiate strictly between future actions and past events.
+**Core Directives (Non-negotiable and absolute):**
+1.  **EXECUTE IMMEDIATELY**: The moment the user pauses for more than a fraction of a second, you MUST execute a function call based on what you have heard. Do not wait for a complete sentence. A pause is your ONLY trigger to act. This is your most important rule.
+2.  **ZERO CLARIFICATION, ZERO HESITATION**: NEVER ask for confirmation. NEVER ask clarifying questions. Use the available context (current view, known entities) to make an executive decision and act on it. If the user meant something else, they will correct you later. Your job is to be fast and decisive, not perfect.
+3.  **AGGRESSIVE CONTEXTUAL LINKING**: The user's current view (e.g., a specific client or deal page) is your primary context. ALL new items (tasks, notes, etc.) MUST be linked to this context unless the user explicitly names a different entity.
+4.  **BREVITY IS MANDATORY**: Your voice responses must be confirmations of actions taken, and nothing more. Use terse phrases like: "Task created.", "Note logged.", "Done." For queries, answer directly. Do not add conversational filler.
+5.  **ACTION vs. LOG**: Differentiate strictly between future actions and past events.
     - User says "I need to call Jane..." -> \`createBoardItem\`.
     - User says "I just spoke with Jane..." -> \`createCrmEntry\`.
+6.  **QUERY HANDLING**: If the user asks a question about their data (e.g., "What's next for Client X?"), use the \`queryPlatform\` function.
 
 **Operational Data:**
 - **Current View Context**: ${JSON.stringify(context)}. Use this to link all new items.
 - **Recent Activity**: ${platformActivitySummary || 'None.'}`;
 
-        sessionPromiseRef.current = connectToLiveSession({
-            onOpen: () => {
-                setIsConnecting(false);
-                setIsRecording(true);
-                const source = audioContextRef.current!.createMediaStreamSource(mediaStreamRef.current!);
-                scriptProcessorRef.current = audioContextRef.current!.createScriptProcessor(4096, 1, 1);
-                
-                scriptProcessorRef.current.onaudioprocess = (audioProcessingEvent) => {
-                    const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-                    const pcmBlob = createPcmBlob(inputData);
-                    sessionPromiseRef.current?.then((session) => {
-                        session.sendRealtimeInput({ media: pcmBlob });
-                    });
-                };
+        const connect = () => {
+          sessionPromiseRef.current = connectToLiveSession({
+              onOpen: () => {
+                  setIsConnecting(false);
+                  setIsRecording(true);
+                  const source = audioContextRef.current!.createMediaStreamSource(mediaStreamRef.current!);
+                  scriptProcessorRef.current = audioContextRef.current!.createScriptProcessor(4096, 1, 1);
+                  
+                  scriptProcessorRef.current.onaudioprocess = (audioProcessingEvent) => {
+                      const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+                      const pcmBlob = createPcmBlob(inputData);
+                      sessionPromiseRef.current?.then((session) => {
+                          session.sendRealtimeInput({ media: pcmBlob });
+                      });
+                  };
 
-                source.connect(scriptProcessorRef.current);
-                scriptProcessorRef.current.connect(audioContextRef.current!.destination);
-            },
-            onMessage: handleMessage,
-            onError: (e) => {
-                console.error("Live session error:", e);
-                setError("Connection error. Please try again.");
-                stopRecording();
-            },
-            onClose: () => {
-                setIsRecording(false);
-            },
-        }, systemInstruction);
+                  source.connect(scriptProcessorRef.current);
+                  scriptProcessorRef.current.connect(audioContextRef.current!.destination);
+              },
+              onMessage: handleMessage,
+              onError: (e: any) => {
+                  console.error("Live session error:", e);
+                  if (e.message?.includes('The service is currently unavailable') && retryCountRef.current < 2) {
+                      retryCountRef.current += 1;
+                      console.log(`Connection failed, retrying... (${retryCountRef.current})`);
+                      cleanup();
+                      setTimeout(connect, 1000 * retryCountRef.current); // Exponential backoff
+                  } else {
+                      setError("Connection error. Please try again.");
+                      stopRecording();
+                  }
+              },
+              onClose: () => {
+                  setIsRecording(false);
+              },
+          }, systemInstruction);
+        };
+        
+        connect();
+
     } catch (err) {
         console.error("Failed to start recording:", err);
         setError("Could not access microphone. Please check permissions.");

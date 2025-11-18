@@ -1,26 +1,34 @@
 import React, { useState } from 'react';
-import { TeamMember, Role, RoleScope, RolePermission } from '../types';
-
-const mockTeam: TeamMember[] = [
-  { id: '1', name: 'Grandma Oloo', email: 'grandma@oloo.ai', status: 'Active', role: { scope: 'All access', permission: 'Can edit' } },
-  { id: '2', name: 'John Doe', email: 'john@example.com', status: 'Active', role: { scope: 'Deals only', permission: 'Can edit' } },
-  { id: '3', name: 'Jane Smith', email: 'jane@example.com', status: 'Invited', role: { scope: 'Clients only', permission: 'Read-only' } },
-];
+import { useKanban } from '../hooks/useKanban';
+import { Role } from '../types';
 
 const PlusIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>);
 
 const TeamView: React.FC = () => {
-    const [team, setTeam] = useState<TeamMember[]>(mockTeam);
+    const { teamMembers, inviteMember } = useKanban();
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [isInviting, setIsInviting] = useState(false);
+    const [inviteSuccess, setInviteSuccess] = useState(false);
+
+    const handleInvite = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (inviteEmail) {
+            setIsInviting(true);
+            // Simulate API call
+            setTimeout(() => {
+                inviteMember(inviteEmail, { scope: 'All access', permission: 'Can edit' } as Role);
+                setInviteEmail('');
+                setIsInviting(false);
+                setInviteSuccess(true);
+                setTimeout(() => setInviteSuccess(false), 3000);
+            }, 1000);
+        }
+    };
 
     return (
         <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                 <h2 className="text-2xl font-semibold text-[#15803D] mb-2 sm:mb-0">Team & Access</h2>
-                <button
-                className="flex items-center bg-[#15803D] hover:bg-[#166534] text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                >
-                <PlusIcon /> Invite Member
-                </button>
             </div>
 
             <div className="bg-white rounded-xl shadow-lg border border-[#E5E7EB] overflow-hidden">
@@ -35,7 +43,7 @@ const TeamView: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {team.map(member => (
+                            {teamMembers.map(member => (
                                 <tr key={member.id} className="border-b border-[#E5E7EB] last:border-b-0 hover:bg-gray-50">
                                     <td className="p-4">
                                         <p className="font-semibold text-[#111827]">{member.name}</p>
@@ -61,10 +69,18 @@ const TeamView: React.FC = () => {
 
             <div className="mt-8 bg-white p-6 rounded-xl shadow-lg border border-[#E5E7EB]">
                 <h3 className="text-lg font-semibold mb-4 text-[#111827]">Invite a new member</h3>
+                <form onSubmit={handleInvite}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label className="block text-sm font-medium text-[#111827] mb-2">Email Address</label>
-                        <input type="email" placeholder="new.teammate@example.com" className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]" />
+                        <input 
+                            type="email" 
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                            placeholder="new.teammate@example.com" 
+                            className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]" 
+                            required
+                        />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-[#111827] mb-2">What can this person do?</label>
@@ -83,9 +99,13 @@ const TeamView: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div className="mt-6 flex justify-end">
-                     <button className="bg-[#15803D] hover:bg-[#166534] text-white font-bold py-2 px-4 rounded-lg transition-colors">Send Invite</button>
+                <div className="mt-6 flex justify-end items-center space-x-4">
+                     {inviteSuccess && <span className="text-green-600 font-medium">Invite sent successfully!</span>}
+                     <button type="submit" disabled={isInviting} className="bg-[#15803D] hover:bg-[#166534] text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-400">
+                        {isInviting ? 'Sending...' : 'Send Invite'}
+                     </button>
                 </div>
+                </form>
             </div>
         </div>
     );

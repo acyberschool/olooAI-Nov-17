@@ -1,14 +1,13 @@
 
 import React, { useMemo } from 'react';
-import { Deal, Task, PlatformInsight, KanbanStatus } from '../types';
+import { Deal, Task, KanbanStatus } from '../types';
 
 interface PerformanceSnapshotProps {
   deals: Deal[];
   tasks: Task[];
-  insights: PlatformInsight[];
 }
 
-const PerformanceSnapshot: React.FC<PerformanceSnapshotProps> = ({ deals, tasks, insights }) => {
+const PerformanceSnapshot: React.FC<PerformanceSnapshotProps> = ({ deals, tasks }) => {
 
     const metrics = useMemo(() => {
         const totalRevenue = deals
@@ -29,7 +28,7 @@ const PerformanceSnapshot: React.FC<PerformanceSnapshotProps> = ({ deals, tasks,
     return (
         <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
             <h3 className="text-lg font-semibold text-brevo-text-primary mb-4">Performance Snapshot</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                     <p className="text-sm text-green-800 font-medium">Total Revenue</p>
                     <p className="text-2xl font-bold text-brevo-text-primary">${metrics.totalRevenue.toLocaleString()}</p>
@@ -42,18 +41,6 @@ const PerformanceSnapshot: React.FC<PerformanceSnapshotProps> = ({ deals, tasks,
                     <p className="text-sm text-red-800 font-medium">Overdue Tasks</p>
                     <p className="text-2xl font-bold text-brevo-text-primary">{metrics.overdueTasks}</p>
                 </div>
-            </div>
-            
-            <div>
-                 <h4 className="font-semibold text-brevo-text-primary mb-3">Walter's Focus for Today:</h4>
-                 <div className="space-y-2">
-                    {insights.slice(0, 3).map(insight => (
-                         <div key={insight.id} className="bg-gray-50 border-l-4 border-brevo-cta p-3 rounded-r-lg flex items-start">
-                            <span className="text-brevo-cta mr-3 mt-0.5">💡</span>
-                            <p className="text-sm text-brevo-text-secondary">{insight.text}</p>
-                        </div>
-                    ))}
-                 </div>
             </div>
         </div>
     );

@@ -1,5 +1,3 @@
-
-
 import type { FunctionDeclaration, Schema, Blob } from '@google/genai';
 import { Type, Modality } from '@google/genai';
 
@@ -29,6 +27,9 @@ export interface Task {
   type: TaskType;
   playbookStepId?: string;
   subTasks?: { id: string; text: string; isDone: boolean }[];
+  createdAt: string; // Added for Gantt Chart
+  projectId?: string;
+  assigneeId?: string; // New: Task owner
 }
 
 export interface BusinessLine {
@@ -58,6 +59,14 @@ export interface Client {
   aiFocus: string;
   businessLineId: string;
   suggestions?: Suggestion[];
+  // New CRM Fields
+  contactPersonName?: string;
+  contactPersonEmail?: string;
+  contactPersonNumber?: string;
+  officeLocation?: string;
+  officeNumber?: string;
+  linkedinUrl?: string;
+  twitterUrl?: string;
 }
 
 export interface Deal {
@@ -75,8 +84,35 @@ export interface Deal {
   amountPaid: number;
 }
 
+export type ProjectStage = 'Lead' | 'In design' | 'Live' | 'Closing' | 'Dormant';
+export type ProjectDealType = 'Revenue Share' | 'Fee-based' | 'Grant' | 'In-kind';
+
+export interface Project {
+  id: string;
+  partnerName: string;
+  projectName: string;
+  goal: string;
+  dealType: ProjectDealType;
+  expectedRevenue: number;
+  impactMetric: string;
+  stage: ProjectStage;
+  projectOwner: string;
+  lastTouchDate: string;
+  lastTouchSummary: string;
+  nextAction: string;
+  nextActionOwner: string;
+  nextActionDueDate: string;
+  opportunityNote: string;
+  clientId?: string;
+  // Fields for AI proposals
+  proposedLastTouchSummary?: string;
+  proposedNextAction?: string;
+  proposedNextActionDueDate?: string;
+  proposedStage?: ProjectStage;
+}
+
 export type DocumentCategory = 'SOPs' | 'Legal' | 'Templates' | 'Marketing' | 'Business Development' | 'Playbooks';
-export type DocumentOwnerType = 'businessLine' | 'client' | 'deal';
+export type DocumentOwnerType = 'businessLine' | 'client' | 'deal' | 'project';
 
 export interface Document {
   id: string;
@@ -100,6 +136,7 @@ export interface CRMEntry {
   id: string;
   clientId: string;
   dealId?: string;
+  projectId?: string;
   createdAt: string;
   type: CRMEntryType;
   summary: string;
@@ -157,16 +194,16 @@ export interface SearchTrend {
     insight: string;
 }
 
-export interface PlatformInsight {
-    id: string;
-    text: string;
-}
-
 export interface FilterOptions {
     location: string;
     timeframe: string;
     scope: string;
     customQuery: string;
+}
+
+export interface PlatformInsight {
+    id: string;
+    text: string;
 }
 
 // --- AI Router Brain Types ---
@@ -195,8 +232,6 @@ export interface RouterBrainResult {
 
 
 // --- Gemini Types from @google/genai ---
-// FIX: Replaced local type definitions with aliases to the official @google/genai types
-// to ensure consistency and adherence to coding guidelines.
 export { Type as GeminiType };
 export type { Schema as GeminiSchema };
 export type { FunctionDeclaration as GeminiFunctionDeclaration };
