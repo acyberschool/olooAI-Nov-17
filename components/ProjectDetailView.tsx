@@ -7,7 +7,6 @@ import Tabs from './Tabs';
 import ContextualWalter from './ContextualWalter';
 import DocumentManager from './DocumentManager';
 import ClientPulseView from './ClientPulseView';
-import PlaybookEditorModal from './PlaybookEditorModal';
 
 interface ProjectDetailViewProps {
   project: Project;
@@ -24,7 +23,6 @@ type ProjectTab = 'Work' | 'Conversations' | 'Documents' | 'Research' | 'Playboo
 
 const statusOptions: ProjectStage[] = ['Lead', 'In design', 'Live', 'Closing', 'Dormant'];
 
-// Reusable Editable Title Component
 const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> = ({ value, onSave }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [text, setText] = useState(value);
@@ -91,7 +89,6 @@ const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ project, client, 
                     </div>
                 );
              case 'Conversations':
-                // Filter CRM entries for this project or client if explicit project ID linking isn't fully robust in mock data yet
                 const projectEntries = kanbanApi.crmEntries.filter(e => e.projectId === project.id || (e.clientId === project.clientId && e.summary.includes(project.projectName)));
                 return (
                     <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
@@ -111,7 +108,6 @@ const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ project, client, 
                     </div>
                 );
             case 'Documents':
-                // Filter documents
                  const projectDocs = kanbanApi.documents.filter(d => d.ownerId === project.id);
                  return (
                     <DocumentManager

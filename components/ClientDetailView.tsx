@@ -1,18 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { Client, Task, Deal, Opportunity, Document, BusinessLine, CRMEntry, Suggestion, Project } from '../types';
+import { Client, Task, Deal, Opportunity, Document, BusinessLine, CRMEntry, Suggestion, Project, Contact } from '../types';
 import KanbanBoard from './KanbanBoard';
 import { useKanban } from '../hooks/useKanban';
 import DocumentManager from './DocumentManager';
 import MarketingCollateralGenerator from './MarketingCollateralGenerator';
 import CRMIcon from './CRMIcon';
-import SuggestionStrip from './SuggestionStrip';
-import EditTaskModal from './EditTaskModal';
 import Tabs from './Tabs';
 import { UniversalInputContext } from '../App';
 import ClientPulseView from './ClientPulseView';
 import EmailClientModal from './EmailClientModal';
 import ContextualWalter from './ContextualWalter';
+import AddContactModal from './AddContactModal';
 
 interface ClientDetailViewProps {
   client: Client;
@@ -31,12 +30,8 @@ interface ClientDetailViewProps {
   onOpenUniversalInput: (context: UniversalInputContext) => void;
 }
 
-type ClientTab = 'Overview' | 'Work' | 'Conversations' | 'Client Pulse' | 'Documents' | 'AI Ideas';
+type ClientTab = 'Overview' | 'Work' | 'Conversations' | 'Contacts' | 'Client Pulse' | 'Documents' | 'AI Ideas';
 
-const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
-const PaperclipIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>);
-
-// Reusable Editable Title
 const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> = ({ value, onSave }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [text, setText] = useState(value);
@@ -122,9 +117,8 @@ const EditableField: React.FC<{
   );
 };
 
-
 const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
-    const { client, onBack, onSelectBusinessLine } = props;
+    const { client, onBack } = props;
     const [activeTab, setActiveTab] = useState<ClientTab>('Overview');
     const [isUpdating, setIsUpdating] = useState(false);
 
@@ -141,6 +135,7 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
     const tabContent = () => {
         switch (activeTab) {
             case 'Overview': return <OverviewTab {...props} />;
+            case 'Contacts': return <ContactsTab client={client} kanbanApi={props.kanbanApi} />;
             case 'Work': return <WorkTab {...props} />;
             case 'Conversations': return <ConversationsTab {...props} />;
             case 'Client Pulse': return <ClientPulseView client={props.client} kanbanApi={props.kanbanApi} />;
@@ -176,7 +171,6 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
             </div>
         </div>
         
-        {/* Contextual Walter for Clients */}
         <ContextualWalter 
             onUpdate={handleUpdate}
             onApprove={() => props.kanbanApi.approveClientUpdate(client.id)}
@@ -193,7 +187,7 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
         />
 
         <Tabs
-            tabs={['Overview', 'Work', 'Conversations', 'Client Pulse', 'Documents', 'AI Ideas']}
+            tabs={['Overview', 'Contacts', 'Work', 'Conversations', 'Client Pulse', 'Documents', 'AI Ideas']}
             activeTab={activeTab}
             setActiveTab={setActiveTab as (tab: string) => void}
         />
@@ -204,26 +198,7 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
   );
 };
 
-// --- TAB COMPONENTS ---
-
-const ContactInfoCard: React.FC<{ client: Client, onEmailClick: () => void }> = ({ client, onEmailClick }) => (
-    <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
-         <h2 className="text-xl font-semibold text-brevo-text-primary mb-4">Contact Information</h2>
-         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-base">
-            {client.contactPersonName && <div><p className="font-semibold text-brevo-text-secondary">Contact Person</p><p>{client.contactPersonName}</p></div>}
-            {client.contactPersonEmail && <div><p className="font-semibold text-brevo-text-secondary">Email</p><button onClick={onEmailClick} className="text-blue-600 hover:underline">{client.contactPersonEmail}</button></div>}
-            {client.contactPersonNumber && <div><p className="font-semibold text-brevo-text-secondary">Phone</p><a href={`tel:${client.contactPersonNumber}`} className="text-blue-600 hover:underline">{client.contactPersonNumber}</a></div>}
-            {client.officeLocation && <div><p className="font-semibold text-brevo-text-secondary">Location</p><p>{client.officeLocation}</p></div>}
-            {client.linkedinUrl && <div><p className="font-semibold text-brevo-text-secondary">LinkedIn</p><a href={client.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Profile</a></div>}
-            {client.twitterUrl && <div><p className="font-semibold text-brevo-text-secondary">Twitter</p><a href={client.twitterUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Profile</a></div>}
-         </div>
-    </div>
-);
-
-
 const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBack }) => {
-    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
@@ -244,8 +219,6 @@ const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBac
                 </div>
             </div>
             
-            <ContactInfoCard client={client} onEmailClick={() => setIsEmailModalOpen(true)} />
-
             <div className="mt-8 pt-6 border-t border-red-200 bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
                 <h3 className="text-lg font-semibold text-red-700 mb-2">Danger Zone</h3>
                 <p className="text-sm text-brevo-text-secondary mb-3">Deleting this client will also delete all their associated deals, tasks, and documents. This action cannot be undone.</p>
@@ -261,18 +234,49 @@ const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBac
                     Delete this Client
                 </button>
             </div>
-            {isEmailModalOpen && (
-                <EmailClientModal
-                    isOpen={isEmailModalOpen}
-                    onClose={() => setIsEmailModalOpen(false)}
-                    client={client}
-                    onSend={(subject, body) => kanbanApi.logEmailToCRM(client.id, undefined, subject, body)}
-                />
-            )}
         </div>
     )
 };
 
+const ContactsTab: React.FC<{ client: Client, kanbanApi: ReturnType<typeof useKanban> }> = ({ client, kanbanApi }) => {
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    const clientContacts = kanbanApi.contacts.filter(c => c.clientId === client.id);
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-brevo-text-primary">Contacts</h3>
+                <button onClick={() => setIsAddOpen(true)} className="bg-brevo-cta hover:bg-brevo-cta-hover text-white px-4 py-2 rounded-md text-sm">Add Contact</button>
+            </div>
+            {clientContacts.length > 0 ? (
+                <div className="space-y-4">
+                    {clientContacts.map(contact => (
+                        <div key={contact.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex justify-between items-start">
+                            <div>
+                                <h4 className="font-bold text-lg">{contact.name}</h4>
+                                <p className="text-sm text-gray-600">{contact.role}</p>
+                                <div className="mt-2 space-y-1">
+                                    <p className="text-sm"><a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">{contact.email}</a></p>
+                                    <p className="text-sm"><a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">{contact.phone}</a></p>
+                                </div>
+                            </div>
+                            <button onClick={() => kanbanApi.deleteContact(contact.id)} className="text-red-500 hover:text-red-700 text-sm">Delete</button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-gray-500 text-center py-8">No contacts added yet.</p>
+            )}
+            <AddContactModal 
+                isOpen={isAddOpen} 
+                onClose={() => setIsAddOpen(false)} 
+                onSave={(data) => kanbanApi.addContact({...data, clientId: client.id})} 
+            />
+        </div>
+    )
+}
+
+// ... (Keep WorkTab, ConversationsTab, DocumentsTab, AiIdeasTab as they were)
 const WorkTab: React.FC<ClientDetailViewProps> = ({ client, tasks, deals, projects, businessLines, onSelectBusinessLine, onSelectDeal, onSelectProject, onSelectTask, kanbanApi, onOpenUniversalInput }) => {
     const handleAddDeal = () => {
         onOpenUniversalInput({
@@ -297,7 +301,7 @@ const WorkTab: React.FC<ClientDetailViewProps> = ({ client, tasks, deals, projec
                     deals={deals}
                     updateTaskStatus={kanbanApi.updateTaskStatusById}
                     onSelectBusinessLine={onSelectBusinessLine}
-                    onSelectClient={() => {}} // no-op
+                    onSelectClient={() => {}} 
                     onSelectDeal={onSelectDeal}
                     onSelectTask={onSelectTask}
                 />
@@ -305,7 +309,7 @@ const WorkTab: React.FC<ClientDetailViewProps> = ({ client, tasks, deals, projec
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold text-brevo-text-primary">Deals</h3>
-                    <button onClick={handleAddDeal} className="flex items-center text-sm bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-1 px-3 rounded-lg transition-colors"><PlusIcon />Add Deal</button>
+                    <button onClick={handleAddDeal} className="flex items-center text-sm bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-1 px-3 rounded-lg transition-colors">Add Deal</button>
                 </div>
                  {deals.length > 0 ? (
                     <ul className="space-y-3">
@@ -323,7 +327,7 @@ const WorkTab: React.FC<ClientDetailViewProps> = ({ client, tasks, deals, projec
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold text-brevo-text-primary">Projects</h3>
-                    <button onClick={handleAddProject} className="flex items-center text-sm bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-1 px-3 rounded-lg transition-colors"><PlusIcon />Add Project</button>
+                    <button onClick={handleAddProject} className="flex items-center text-sm bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-1 px-3 rounded-lg transition-colors">Add Project</button>
                 </div>
                  {projects.length > 0 ? (
                     <ul className="space-y-3">
@@ -343,7 +347,6 @@ const WorkTab: React.FC<ClientDetailViewProps> = ({ client, tasks, deals, projec
 };
 
 const ConversationsTab: React.FC<ClientDetailViewProps> = ({ client, crmEntries, documents, onOpenUniversalInput }) => {
-    
     const handleTypeNoteClick = () => {
         onOpenUniversalInput({
             clientId: client.id,
@@ -376,7 +379,7 @@ const ConversationsTab: React.FC<ClientDetailViewProps> = ({ client, crmEntries,
                                             <p className="text-brevo-text-primary">{entry.summary}</p>
                                             {doc && (
                                                 <a href={doc.url} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center text-base text-brevo-cta hover:underline">
-                                                    <PaperclipIcon /> {doc.name}
+                                                    {doc.name}
                                                 </a>
                                             )}
                                         </div>
@@ -386,7 +389,7 @@ const ConversationsTab: React.FC<ClientDetailViewProps> = ({ client, crmEntries,
                     </ul>
                 </div>
             ) : (
-                <p className="text-center text-brevo-text-secondary py-8">No conversations logged yet. Use your voice or add a note to get started!</p>
+                <p className="text-center text-brevo-text-secondary py-8">No conversations logged yet.</p>
             )}
         </div>
     );
@@ -405,68 +408,35 @@ const DocumentsTab: React.FC<ClientDetailViewProps> = ({ documents, client, kanb
 
 const AiIdeasTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi }) => {
     const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-    const [opportunitySources, setOpportunitySources] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     
-    const handleGetOpportunities = async (expand = false) => {
+    const handleGetOpportunities = async () => {
         setIsLoading(true);
-        const { opportunities: result, sources } = await kanbanApi.getClientOpportunities(client, expand);
+        const { opportunities: result } = await kanbanApi.getClientOpportunities(client);
         setOpportunities(result);
-        setOpportunitySources(sources);
         setIsLoading(false);
-    };
-
-    const handleAddOpportunityAsTask = (opportunityText: string) => {
-        kanbanApi.addTask({
-            title: opportunityText,
-            clientId: client.id,
-            businessLineId: client.businessLineId,
-        });
     };
 
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
                 <h3 className="text-xl font-semibold text-brevo-text-primary mb-4">Growth Opportunities</h3>
-                <div className="flex space-x-4">
-                    <button 
-                        onClick={() => handleGetOpportunities(false)} 
-                        disabled={isLoading}
-                        className="bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300"
-                    >
-                        {isLoading ? 'Analyzing...' : 'Ask AI for ideas'}
-                    </button>
-                </div>
+                <button 
+                    onClick={handleGetOpportunities} 
+                    disabled={isLoading}
+                    className="bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300"
+                >
+                    {isLoading ? 'Analyzing...' : 'Ask AI for ideas'}
+                </button>
                 {opportunities.length > 0 && (
                     <div className="mt-6 bg-gray-50 p-4 rounded-md border border-gray-200">
-                        <h4 className="font-semibold text-lg text-green-700 mb-3">Here are some ideas:</h4>
                         <ul className="space-y-3">
                         {opportunities.map(opp => (
                             <li key={opp.id} className="flex items-center justify-between text-brevo-text-secondary">
                                 <span>- {opp.text}</span>
-                                <button
-                                    onClick={() => handleAddOpportunityAsTask(opp.text)}
-                                    className="flex items-center text-sm bg-gray-200 hover:bg-gray-300 text-brevo-text-primary font-semibold py-1 px-2 rounded-md transition-colors"
-                                >
-                                    <PlusIcon /> Add task
-                                </button>
                             </li>
                         ))}
                         </ul>
-                         {opportunitySources.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                                <h5 className="text-sm font-semibold uppercase text-brevo-text-secondary tracking-wider">Sources from Walter's Research</h5>
-                                <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                                    {opportunitySources.map((source: any, index: number) => (
-                                        <li key={source.uri || index} className="text-blue-600 truncate">
-                                            <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline" title={source.uri}>
-                                                {source.title || source.uri}
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

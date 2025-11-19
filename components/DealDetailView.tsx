@@ -23,12 +23,10 @@ interface DealDetailViewProps {
   onSelectBusinessLine: (id: string) => void;
   onBack: () => void;
   onSelectTask: (task: Task) => void;
-  clients: Client[]; // Needed for changing client
+  clients: Client[]; 
 }
 
 type DealTab = 'Overview' | 'Work' | 'Documents' | 'AI Ideas' | 'History';
-
-const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 
 const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> = ({ value, onSave }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -207,7 +205,6 @@ const DealDetailView: React.FC<DealDetailViewProps> = (props) => {
         <span className="text-[#111827] font-semibold">{deal.name}</span>
       </div>
       
-      {/* Contextual Walter */}
        <ContextualWalter
             onUpdate={handleUpdate}
             onApprove={() => kanbanApi.approveDealUpdate(deal.id)}
@@ -235,8 +232,6 @@ const DealDetailView: React.FC<DealDetailViewProps> = (props) => {
     </div>
   );
 };
-
-// --- TAB COMPONENTS ---
 
 const OverviewTab: React.FC<DealDetailViewProps> = ({ deal, client, kanbanApi, onBack }) => {
     const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
@@ -302,33 +297,6 @@ const OverviewTab: React.FC<DealDetailViewProps> = ({ deal, client, kanbanApi, o
                 </div>
             </div>
             
-            {/* Deal Contact Info - Updates the Client */}
-            <div className="bg-white border border-brevo-border rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-brevo-text-primary mb-4">Contact Information (Linked to {client.name})</h3>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <EditableField 
-                        label="Contact Person"
-                        value={client.contactPersonName || ''}
-                        onSave={(val) => kanbanApi.updateClient(client.id, { contactPersonName: val })}
-                    />
-                    <EditableField 
-                        label="Email"
-                        value={client.contactPersonEmail || ''}
-                        onSave={(val) => kanbanApi.updateClient(client.id, { contactPersonEmail: val })}
-                    />
-                    <EditableField 
-                        label="Phone"
-                        value={client.contactPersonNumber || ''}
-                        onSave={(val) => kanbanApi.updateClient(client.id, { contactPersonNumber: val })}
-                    />
-                     <EditableField 
-                        label="Location"
-                        value={client.officeLocation || ''}
-                        onSave={(val) => kanbanApi.updateClient(client.id, { officeLocation: val })}
-                    />
-                 </div>
-            </div>
-
             <SuggestionStrip 
                 contextText={`the next step for "${deal.name}"`}
                 suggestions={deal.suggestions || []}
@@ -401,69 +369,35 @@ const DocumentsTab: React.FC<DealDetailViewProps> = ({ deal, documents, kanbanAp
 
 const AiIdeasTab: React.FC<DealDetailViewProps> = ({ deal, client, businessLine, kanbanApi }) => {
     const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-    const [opportunitySources, setOpportunitySources] = useState<any[]>([]);
     const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
 
-    const handleGetOpportunities = async (expand = false) => {
+    const handleGetOpportunities = async () => {
         setIsLoadingOpportunities(true);
-        const { opportunities: result, sources } = await kanbanApi.getDealOpportunities(deal, expand);
+        const { opportunities: result } = await kanbanApi.getDealOpportunities(deal);
         setOpportunities(result);
-        setOpportunitySources(sources);
         setIsLoadingOpportunities(false);
     };
 
-    const handleAddOpportunityAsTask = (opportunityText: string) => {
-        kanbanApi.addTask({
-            title: opportunityText,
-            dealId: deal.id,
-            clientId: client.id,
-            businessLineId: businessLine.id,
-        });
-    };
-    
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-lg border border-[#E5E7EB]">
                 <h3 className="text-xl font-semibold text-[#111827] mb-4">Next Steps & Upsell Ideas</h3>
-                <div className="flex space-x-4">
-                    <button 
-                        onClick={() => handleGetOpportunities(false)} 
-                        disabled={isLoadingOpportunities}
-                        className="bg-[#15803D] hover:bg-[#166534] text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300"
-                    >
-                        {isLoadingOpportunities ? 'Analyzing...' : 'Ask AI for ideas'}
-                    </button>
-                </div>
+                <button 
+                    onClick={() => handleGetOpportunities()} 
+                    disabled={isLoadingOpportunities}
+                    className="bg-[#15803D] hover:bg-[#166534] text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300"
+                >
+                    {isLoadingOpportunities ? 'Analyzing...' : 'Ask AI for ideas'}
+                </button>
                 {opportunities.length > 0 && (
                      <div className="mt-6 bg-gray-50 p-4 rounded-md border border-gray-200">
-                        <h4 className="font-semibold text-lg text-[#15803D] mb-3">Here are some ideas:</h4>
                         <ul className="space-y-3">
                         {opportunities.map(opp => (
                             <li key={opp.id} className="flex items-center justify-between text-[#374151]">
                                 <span>- {opp.text}</span>
-                                <button
-                                    onClick={() => handleAddOpportunityAsTask(opp.text)}
-                                    className="flex items-center text-sm bg-[#DCFCE7] hover:bg-green-200 text-[#14532D] font-semibold py-1 px-2 rounded-md transition-colors"
-                                >
-                                    <PlusIcon /> Add task
-                                </button>
                             </li>
                         ))}
                         </ul>
-                         {opportunitySources.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                                <h5 className="text-sm font-semibold uppercase text-brevo-text-secondary tracking-wider">Sources from Walter's Research</h5>
-                                <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                                    {opportunitySources.map((source: any, index: number) => (
-                                        <li key={source.uri || index} className="text-blue-600 truncate">
-                                            <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline" title={source.uri}>
-                                                {source.title || source.uri}
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>
@@ -482,7 +416,7 @@ const HistoryTab: React.FC<DealDetailViewProps> = ({ deal, kanbanApi }) => {
     
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg border border-[#E5E7EB]">
-            <h3 className="text-xl font-semibold text-[#111827] mb-4">Conversation History for "{deal.name}"</h3>
+            <h3 className="text-xl font-semibold text-[#111827] mb-4">Conversation History</h3>
             {dealHistory.length > 0 ? (
                 <ul className="space-y-4">
                     {dealHistory.map(entry => (

@@ -20,8 +20,6 @@ const PencilIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-
 const MoreIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>);
 const SparkleIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM5.22 5.22a.75.75 0 011.06 0l1.06 1.06a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zM2 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 012 10zm3.22 4.78a.75.75 0 010-1.06l1.06-1.06a.75.75 0 111.06 1.06l-1.06 1.06a.75.75 0 01-1.06 0zm7.56-9.56a.75.75 0 011.06 0l1.06 1.06a.75.75 0 11-1.06 1.06l-1.06-1.06a.75.75 0 01-1.06 0zM17 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0117 10zm-3.22 4.78a.75.75 0 010-1.06l1.06-1.06a.75.75 0 111.06 1.06l-1.06 1.06a.75.75 0 01-1.06 0zM10 17a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0110 17z" clipRule="evenodd" /></svg>);
 
-
-// Helper to determine the primary action for a subtask
 const getPrimaryAction = (text: string) => {
     const lowerText = text.toLowerCase();
     if (['draft', 'prepare', 'create', 'write', 'generate', 'invoice', 'proposal', 'agenda'].some(kw => lowerText.includes(kw))) {
@@ -96,7 +94,7 @@ const SubtaskItem: React.FC<{
         setTimeout(async () => {
             await kanbanApi.generateMeetingTranscript(task.id);
             setIsRecording(false);
-        }, 3000); // Mock recording for 3 seconds
+        }, 3000);
         setIsMenuOpen(false);
     }
 
@@ -153,10 +151,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   useEffect(() => {
     if (isOpen) {
         setIsEditing(false);
-        // Initialize the editedTask state with the full task object when the modal opens
         setEditedTask({
             ...task,
-            // Format date for datetime-local input
             dueDate: task.dueDate ? new Date(new Date(task.dueDate).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : undefined
         });
     }
@@ -168,15 +164,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   };
 
   const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent modal from closing and triggering other actions
-    // Convert local datetime-local string back to ISO string for saving
+    e.stopPropagation(); 
     const taskToSave = {
         ...editedTask,
         dueDate: editedTask.dueDate ? new Date(editedTask.dueDate).toISOString() : undefined,
     };
     kanbanApi.updateTask(task.id, taskToSave);
     setIsEditing(false);
-    onClose(); // Explicitly close the modal after saving
+    onClose(); 
   }
 
   const handleAddNote = () => {

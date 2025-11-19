@@ -166,6 +166,13 @@ export const useVoiceAssistant = ({
                     result = onPlatformQuery(finalArgs.query as string);
                 }
                 break;
+            case 'sendEmail':
+                const subject = encodeURIComponent(finalArgs.subject as string);
+                const body = encodeURIComponent(finalArgs.body as string);
+                const recipient = finalArgs.recipientEmail ? `mailto:${finalArgs.recipientEmail}` : `mailto:`;
+                window.location.href = `${recipient}?subject=${subject}&body=${body}`;
+                result = "Opening email client with draft...";
+                break;
         }
 
         const finalResult = await Promise.resolve(result);
@@ -227,7 +234,6 @@ export const useVoiceAssistant = ({
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         nextStartTimeRef.current = 0;
-        retryCountRef.current = 0;
         
         const context = { currentBusinessLineId, currentClientId, currentDealId };
         // FORCEFUL SYSTEM PROMPT
@@ -266,7 +272,8 @@ export const useVoiceAssistant = ({
               onMessage: handleMessage,
               onError: (e: any) => {
                   console.error("Live session error:", e);
-                  if (e.message?.includes('The service is currently unavailable') && retryCountRef.current < 2) {
+                  // Automatic retry logic for backend errors
+                  if ((e.message?.includes('The service is currently unavailable') || e.message?.includes('Failed to run inference')) && retryCountRef.current < 2) {
                       retryCountRef.current += 1;
                       console.log(`Connection failed, retrying... (${retryCountRef.current})`);
                       cleanup();

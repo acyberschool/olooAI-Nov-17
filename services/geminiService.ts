@@ -1,3 +1,4 @@
+
 import { GeminiBlob, GeminiFunctionDeclaration, GeminiModality, GeminiType } from '../types';
 import { getAiInstance } from '../config/geminiConfig';
 
@@ -248,6 +249,21 @@ const updateDealStatusDeclaration: GeminiFunctionDeclaration = {
     },
 };
 
+const sendEmailDeclaration: GeminiFunctionDeclaration = {
+    name: 'sendEmail',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: "Drafts an email to a recipient. This opens the user's default email client.",
+        properties: {
+            recipientEmail: { type: GeminiType.STRING, description: 'The email address of the recipient.' },
+            subject: { type: GeminiType.STRING, description: 'The subject of the email.' },
+            body: { type: GeminiType.STRING, description: 'The body content of the email.' },
+        },
+        required: ['subject', 'body'],
+    },
+};
+
+
 const assistantTools = [{ functionDeclarations: [
     createCrmEntryDeclaration,
     createBoardItemDeclaration, 
@@ -259,6 +275,7 @@ const assistantTools = [{ functionDeclarations: [
     updateDealStatusDeclaration,
     findProspectsDeclaration,
     queryPlatformDeclaration,
+    sendEmailDeclaration,
 ] }];
 
 // --- Live API Service ---

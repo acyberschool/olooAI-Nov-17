@@ -65,7 +65,6 @@ const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> 
     )
 }
 
-// A new local component for inline editing
 const EditableField: React.FC<{
   label: string;
   value: string;
@@ -118,7 +117,6 @@ const EditableField: React.FC<{
   );
 };
 
-
 const BusinessLineDetailView: React.FC<BusinessLineDetailViewProps> = (props) => {
   const { businessLine, onBack } = props;
   const [activeTab, setActiveTab] = useState<BusinessLineTab>('Overview');
@@ -163,8 +161,6 @@ const BusinessLineDetailView: React.FC<BusinessLineDetailViewProps> = (props) =>
   );
 };
 
-// --- TAB COMPONENTS ---
-
 const OverviewTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, kanbanApi, onBack }) => (
     <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
         <h2 className="text-xl font-semibold text-brevo-text-primary mb-4">Summary</h2>
@@ -206,6 +202,7 @@ const OverviewTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, kanb
     </div>
 );
 
+// ... (keep WorkTab, ClientsTab, PlaybookTab, DocumentsTab, RevenueIdeasTab)
 const WorkTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, tasks, clients, deals, kanbanApi, onSelectClient, onSelectDeal, onSelectTask }) => (
     <div>
         <h3 className="text-xl font-semibold mb-4 text-brevo-text-primary">Tasks for {businessLine.name}</h3>
@@ -215,7 +212,7 @@ const WorkTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, tasks, c
             clients={clients}
             deals={deals}
             updateTaskStatus={kanbanApi.updateTaskStatusById}
-            onSelectBusinessLine={() => {}} // Already here, no-op
+            onSelectBusinessLine={() => {}} 
             onSelectClient={onSelectClient}
             onSelectDeal={onSelectDeal}
             onSelectTask={onSelectTask}
@@ -408,5 +405,6 @@ const RevenueIdeasTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, 
         </div>
     );
 };
+
 
 export default BusinessLineDetailView;

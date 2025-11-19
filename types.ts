@@ -15,6 +15,15 @@ export enum TaskType {
   Meeting = 'Meeting',
 }
 
+export interface Contact {
+    id: string;
+    clientId: string;
+    name: string;
+    role: string;
+    email: string;
+    phone: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -28,9 +37,9 @@ export interface Task {
   type: TaskType;
   playbookStepId?: string;
   subTasks?: { id: string; text: string; isDone: boolean }[];
-  createdAt: string; // Added for Gantt Chart
+  createdAt: string; 
   projectId?: string;
-  assigneeId?: string; // New: Task owner
+  assigneeId?: string; 
 }
 
 export interface BusinessLine {

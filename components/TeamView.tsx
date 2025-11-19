@@ -14,14 +14,11 @@ const TeamView: React.FC = () => {
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
         if (inviteEmail) {
-            // 1. Add to local list (visual feedback)
             inviteMember(inviteEmail, { scope: 'All access', permission: 'Can edit' } as Role);
             
-            // 2. Construct mailto link for real sending
             const subject = encodeURIComponent("Invitation to join olooAI Workspace");
             const body = encodeURIComponent(`Hi,\n\nI'm inviting you to join our workspace on olooAI. We'll be using it to manage tasks, clients, and projects.\n\nPlease accept the invite to get started.\n\nBest,\nAdmin`);
             
-            // Open default email client
             window.location.href = `mailto:${inviteEmail}?subject=${subject}&body=${body}`;
             
             setInviteEmail('');
@@ -112,7 +109,7 @@ const TeamView: React.FC = () => {
                 </div>
                 <div className="mt-6 flex justify-end items-center space-x-4">
                      <button type="submit" className="bg-[#15803D] hover:bg-[#166534] text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 00-2-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                         Send Invite via Email
                      </button>
                 </div>
