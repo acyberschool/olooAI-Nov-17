@@ -9,7 +9,7 @@ interface DocumentManagerProps {
   owner: BusinessLine | Client | Deal | Project;
   ownerType: DocumentOwnerType;
   kanbanApi: ReturnType<typeof useKanban>;
-  onAddDocument: (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => Document;
+  onAddDocument: (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => Promise<Document | null> | Document | null;
   onDeleteDocument: (docId: string) => void;
 }
 

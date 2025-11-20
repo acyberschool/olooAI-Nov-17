@@ -7,7 +7,7 @@ interface BusinessLinesViewProps {
   businessLines: BusinessLine[];
   onSelectBusinessLine: (id: string) => void;
   onOpenUniversalInput: (context: UniversalInputContext) => void;
-  onUpdateBusinessLine: (id: string, data: Partial<Omit<BusinessLine, 'id'>>) => string;
+  onUpdateBusinessLine: (id: string, data: Partial<Omit<BusinessLine, 'id'>>) => Promise<string> | string;
 }
 
 const PlusIcon = () => (

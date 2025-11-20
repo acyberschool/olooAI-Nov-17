@@ -38,11 +38,11 @@ const AiDocGenerator: React.FC<AiDocGeneratorProps> = ({ category, owner, ownerT
         setTimeout(() => setIsCopied(false), 2000);
     }
     
-    const handleSaveToDrive = () => {
-        const newDoc = kanbanApi.addDocument({ name: `${prompt}.gdoc`, content: generatedDraft }, category, owner.id, ownerType);
+    const handleSaveToDrive = async () => {
+        const newDoc = await kanbanApi.addDocument({ name: `${prompt}.gdoc`, content: generatedDraft }, category, owner.id, ownerType);
         setGeneratedDraft('');
         setPrompt('');
-        setSavedDoc(newDoc);
+        if (newDoc) setSavedDoc(newDoc);
     }
 
 

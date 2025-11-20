@@ -6,14 +6,14 @@ import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType, Project }
 type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
 interface UseVoiceAssistantProps {
-  onBoardItemCreate: (itemData: Partial<Task>) => string;
+  onBoardItemCreate: (itemData: Partial<Task>) => string | Promise<string>;
   onCrmEntryCreate: (data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => string;
   onTaskUpdate: (taskTitle: string, newStatus: KanbanStatus) => string;
   onBusinessLineCreate: (data: Omit<BusinessLine, 'id'>) => Promise<string> | string;
-  onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => string;
-  onDealCreate: (data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string; clientId?: string; businessLineId?: string;}) => string;
-  onProjectCreate?: (data: Partial<Omit<Project, 'id'>> & { partnerName: string; projectName: string; goal: string; }) => string;
-  onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed - Won' | 'Closed - Lost') => string;
+  onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => Promise<string> | string;
+  onDealCreate: (data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string; clientId?: string; businessLineId?: string;}) => Promise<string> | string;
+  onProjectCreate?: (data: Partial<Omit<Project, 'id'>> & { partnerName: string; projectName: string; goal: string; }) => Promise<string> | string;
+  onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed - Won' | 'Closed - Lost') => Promise<string> | string;
   onTurnComplete?: (userTranscript: string, assistantTranscript: string) => void;
   onFindProspects?: (data: { businessLineName: string }) => Promise<string>;
   onPlatformQuery?: (query: string) => Promise<string>;
