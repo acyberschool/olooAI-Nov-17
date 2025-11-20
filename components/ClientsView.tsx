@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { Client, BusinessLine } from '../types';
+import { Client, BusinessLine, UniversalInputContext } from '../types';
 import AddClientModal from './AddClientModal';
-import { UniversalInputContext } from '../App';
+import { useKanban } from '../hooks/useKanban'; // Import for Lead Score Logic
 
 interface ClientsViewProps {
   clients: Client[];
@@ -10,6 +10,7 @@ interface ClientsViewProps {
   onSelectClient: (id: string) => void;
   onOpenUniversalInput: (context: UniversalInputContext) => void;
   onUpdateClient: (id: string, data: Partial<Omit<Client, 'id'>>) => string;
+  kanbanApi?: ReturnType<typeof useKanban>; // Optional for lead scoring
 }
 
 const PlusIcon = () => (
@@ -24,9 +25,10 @@ const PencilIcon = () => (
   </svg>
 );
 
-const ClientsView: React.FC<ClientsViewProps> = ({ clients, businessLines, onSelectClient, onOpenUniversalInput, onUpdateClient }) => {
+const ClientsView: React.FC<ClientsViewProps> = ({ clients, businessLines, onSelectClient, onOpenUniversalInput, onUpdateClient, kanbanApi }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [scoringClientId, setScoringClientId] = useState<string | null>(null);
 
   const getBusinessLineName = (id: string) => {
     return businessLines.find(bl => bl.id === id)?.name || 'N/A';
@@ -50,6 +52,21 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, businessLines, onSel
   const handleAddClick = () => {
     onOpenUniversalInput({ placeholder: 'Create a new client named "ABC Limited", a logistics company, for the Fumigation business...' });
   };
+
+  const handleAnalyzeLead = async (e: React.MouseEvent, client: Client) => {
+      e.stopPropagation();
+      if (kanbanApi) {
+          setScoringClientId(client.id);
+          await kanbanApi.generateLeadScore(client);
+          setScoringClientId(null);
+      }
+  }
+
+  const getScoreColor = (score: number) => {
+      if (score >= 80) return 'bg-green-100 text-green-800';
+      if (score >= 50) return 'bg-yellow-100 text-yellow-800';
+      return 'bg-red-100 text-red-800';
+  }
 
   return (
     <div>
@@ -80,10 +97,26 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, businessLines, onSel
                       <PencilIcon />
                     </button>
                 </div>
-                <p className="text-brevo-text-secondary text-sm mb-4"><strong className="text-brevo-text-primary">Who they are:</strong> {client.description}</p>
-                <p className="text-sm bg-gray-100 text-gray-800 rounded-full px-3 py-1 w-fit">
-                    {getBusinessLineName(client.businessLineId)}
-                </p>
+                <p className="text-brevo-text-secondary text-sm mb-4 line-clamp-2"><strong className="text-brevo-text-primary">Who they are:</strong> {client.description}</p>
+                
+                <div className="flex flex-wrap gap-2 mb-2">
+                    <p className="text-sm bg-gray-100 text-gray-800 rounded-full px-3 py-1 w-fit">
+                        {getBusinessLineName(client.businessLineId)}
+                    </p>
+                    {client.leadScore !== undefined ? (
+                         <span className={`text-sm font-bold rounded-full px-3 py-1 ${getScoreColor(client.leadScore)}`}>
+                             Score: {client.leadScore}
+                         </span>
+                    ) : (
+                        <button 
+                            onClick={(e) => handleAnalyzeLead(e, client)}
+                            disabled={scoringClientId === client.id}
+                            className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded-full font-medium transition-colors"
+                        >
+                            {scoringClientId === client.id ? 'Analyzing...' : 'Analyze Lead'}
+                        </button>
+                    )}
+                </div>
               </div>
               <div className="mt-4 pt-4 border-t border-brevo-border">
                  <p className="text-xs text-brevo-text-secondary"><strong className="font-semibold text-brevo-text-primary">AI Focus:</strong> {client.aiFocus}</p>

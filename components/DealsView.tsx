@@ -1,7 +1,7 @@
+
 import React, { useState } from 'react';
-import { Deal, Client, BusinessLine } from '../types';
+import { Deal, Client, BusinessLine, UniversalInputContext } from '../types';
 import AddDealModal from './AddDealModal';
-import { UniversalInputContext } from '../App';
 
 interface DealsViewProps {
   deals: Deal[];

@@ -1,7 +1,7 @@
+
 import React, { useState } from 'react';
-import { BusinessLine } from '../types';
+import { BusinessLine, UniversalInputContext } from '../types';
 import AddBusinessLineModal from './AddBusinessLineModal';
-import { UniversalInputContext } from '../App';
 
 interface BusinessLinesViewProps {
   businessLines: BusinessLine[];

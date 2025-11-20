@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, BusinessLine, Client, Deal, KanbanStatus, TaskType } from '../types';
+import { Task, BusinessLine, Client, Deal, KanbanStatus, TaskType, UniversalInputContext } from '../types';
 import { useKanban } from '../hooks/useKanban';
-import { UniversalInputContext } from '../App';
 import ScheduleMeetingModal from './ScheduleMeetingModal';
 
 interface TaskDetailModalProps {

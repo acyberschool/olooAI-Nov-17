@@ -1,9 +1,10 @@
 
-import { useState, useCallback, useEffect } from 'react';
-import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, FilterOptions, GeminiType, PlatformInsight, Project, TeamMember, Contact, Role, UniversalInputContext } from '../types';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, FilterOptions, GeminiType, PlatformInsight, Project, TeamMember, Contact, Role, UniversalInputContext, SocialPost, GeminiModality } from '../types';
 import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialDocuments, initialPlaybooks, initialCRMEntries, initialProjects, initialTeamMembers, initialContacts } from '../data/mockData';
 import { getAiInstance } from '../config/geminiConfig';
 import { processTextMessage } from '../services/routerBrainService';
+import { generateContentWithSearch, generateVideos } from '../services/geminiService';
 import { trackEvent } from '../App';
 
 // Helper for LocalStorage with error handling
@@ -41,6 +42,7 @@ export const useKanban = () => {
   const [crmEntries, setCrmEntries] = usePersistentState<CRMEntry[]>('oloo_crmEntries', initialCRMEntries);
   const [teamMembers, setTeamMembers] = usePersistentState<TeamMember[]>('oloo_teamMembers', initialTeamMembers);
   const [contacts, setContacts] = usePersistentState<Contact[]>('oloo_contacts', initialContacts);
+  const [socialPosts, setSocialPosts] = usePersistentState<SocialPost[]>('oloo_socialPosts', []);
 
   // THE COACH: Check for overdue tasks on mount/update
   useEffect(() => {
@@ -204,6 +206,9 @@ CONTEXT:
   
   const addClient = useCallback((data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string }) => {
     let businessLine = businessLines.find(bl => bl.id === data.businessLineId);
+    if (!businessLine && data.businessLineName) {
+        businessLine = businessLines.find(bl => bl.name.toLowerCase() === data.businessLineName?.toLowerCase());
+    }
     if (!businessLine && businessLines.length > 0) businessLine = businessLines[0];
 
     const newClient: Client = {
@@ -254,9 +259,38 @@ CONTEXT:
       return `Client deleted.`;
   }, [setClients, setDeals, setTasks, setContacts]);
 
+  const generateLeadScore = useCallback(async (client: Client) => {
+      try {
+          const ai = getAiInstance();
+          const prompt = `Analyze this client and assign a Lead Score (0-100) based on their potential value and engagement.
+          Client: ${client.name}
+          Description: ${client.description}
+          AI Focus: ${client.aiFocus}
+          
+          Return JSON: { "score": number, "reason": string }`;
+          
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: { responseMimeType: 'application/json' }
+          });
+          
+          const result = JSON.parse(response.text.trim());
+          updateClient(client.id, { leadScore: result.score, leadScoreReason: result.reason });
+      } catch (e) {
+          console.error("Lead scoring error:", e);
+      }
+  }, [updateClient]);
+
   const addDeal = useCallback((data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string, clientId?: string, businessLineId?: string }) => {
-    const client = clients.find(c => c.id === data.clientId || c.name.toLowerCase() === data.clientName.toLowerCase());
-    if (!client) return `Client "${data.clientName}" not found.`;
+    let client = clients.find(c => c.id === data.clientId);
+    if (!client && data.clientName) {
+        client = clients.find(c => c.name.toLowerCase() === data.clientName.toLowerCase());
+    }
+    if (!client) {
+        console.warn(`Client "${data.clientName}" not found for deal creation.`);
+        return `Client "${data.clientName}" not found.`;
+    }
 
     const newDeal: Deal = {
       id: `deal-${Date.now()}`,
@@ -372,7 +406,7 @@ CONTEXT:
       setContacts(prev => prev.filter(c => c.id !== id));
   }, [setContacts]);
   
-  const processTextAndExecute = useCallback(async (text: string, context: UniversalInputContext) => {
+  const processTextAndExecute = useCallback(async (text: string, context: UniversalInputContext, file?: { base64: string, mimeType: string }) => {
         const knownData = {
             clients: clients.map(c => c.name),
             deals: deals.map(d => d.name),
@@ -380,22 +414,50 @@ CONTEXT:
         };
         const platformActivitySummary = `Last 3 tasks: ${tasks.slice(0,3).map(t => t.title).join(', ')}.`;
         
-        const result = await processTextMessage(text, knownData, context, platformActivitySummary);
+        const result = await processTextMessage(text, knownData, context, platformActivitySummary, file);
         
+        // 1. Create Business Line
+        if (result.action === 'create_business_line' && result.businessLine) {
+             addBusinessLine(result.businessLine);
+        }
+
+        // 2. Create Client
+        if (result.action === 'create_client' && result.client) {
+            addClient(result.client);
+        }
+
+        // 3. Create Deal
+        if (result.action === 'create_deal' && result.deal) {
+            addDeal(result.deal);
+        }
+        
+        // 4. Create Project
+        if (result.action === 'create_project' && result.project) {
+            addProject(result.project);
+        }
+
+        // 5. Create Task(s)
         if (result.action === 'create_task' || result.action === 'both') {
             result.tasks.forEach(t => {
                 let clientId = context.clientId;
                 let dealId = context.dealId;
                 let businessLineId = context.businessLineId;
                 
+                // If AI identified a specific client name, override context
                 if (t.client_name) {
                     const c = clients.find(cl => cl.name.toLowerCase() === t.client_name?.toLowerCase());
                     if (c) clientId = c.id;
                 }
+
+                // If AI did NOT identify a date, but we have a context date (e.g. calendar click), use it
+                let dueDate = t.due_date;
+                if (!dueDate && context.date) {
+                    dueDate = context.date.toISOString();
+                }
                 
                 addTask({
                     title: t.title,
-                    dueDate: t.due_date || undefined,
+                    dueDate: dueDate || undefined,
                     clientId,
                     dealId,
                     businessLineId
@@ -403,6 +465,7 @@ CONTEXT:
             });
         }
         
+        // 6. Create Note
         if (result.action === 'create_note' || result.action === 'both') {
              if (result.note) {
                  let clientId = context.clientId;
@@ -422,7 +485,313 @@ CONTEXT:
                  }
              }
         }
-  }, [clients, deals, businessLines, tasks, addTask]);
+  }, [clients, deals, businessLines, tasks, addTask, addBusinessLine, addClient, addDeal, addProject]);
+  
+  // --- SOCIAL MEDIA FEATURES ---
+
+  const addSocialPost = useCallback((post: Omit<SocialPost, 'id'>) => {
+      const newPost: SocialPost = {
+          id: `post-${Date.now()}`,
+          ...post
+      };
+      setSocialPosts(prev => [...prev, newPost]);
+      return newPost;
+  }, [setSocialPosts]);
+
+  const updateSocialPost = useCallback((id: string, data: Partial<SocialPost>) => {
+      setSocialPosts(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+  }, [setSocialPosts]);
+
+  const deleteSocialPost = useCallback((id: string) => {
+      setSocialPosts(prev => prev.filter(p => p.id !== id));
+  }, [setSocialPosts]);
+
+  const generateSocialPostDetails = useCallback(async (prompt: string, channel: string, businessLine: BusinessLine, contextFile?: string, contextMimeType?: string, contextLink?: string) => {
+      try {
+          const ai = getAiInstance();
+          let fullPrompt = `You are a social media manager for "${businessLine.name}".
+          Channel: ${channel}.
+          Request: "${prompt}".
+          
+          Task:
+          1. Write an engaging caption (including hashtags).
+          2. Write a detailed prompt for an AI image generator to create a visual for this post.
+          
+          Return JSON object: { "caption": string, "visualPrompt": string }`;
+
+          if (contextLink) fullPrompt += `\nContext Link: ${contextLink}`;
+          
+          const parts: any[] = [{ text: fullPrompt }];
+          if (contextFile && contextMimeType) {
+              parts.unshift({ inlineData: { mimeType: contextMimeType, data: contextFile } });
+          }
+
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: { parts },
+              config: {
+                  responseMimeType: "application/json",
+                  responseSchema: {
+                      type: GeminiType.OBJECT,
+                      properties: {
+                          caption: { type: GeminiType.STRING },
+                          visualPrompt: { type: GeminiType.STRING }
+                      },
+                      required: ["caption", "visualPrompt"]
+                  }
+              }
+          });
+          return JSON.parse(response.text.trim());
+      } catch (e) {
+          console.error(e);
+          return { caption: "Error", visualPrompt: "Error" };
+      }
+  }, []);
+
+  const generateSocialPostContent = useCallback(async (prompt: string, businessLine: BusinessLine, contextFile?: string, contextMimeType?: string, contextLink?: string) => {
+      // Fallback to just returning caption if called directly
+      const result = await generateSocialPostDetails(prompt, "Social Media", businessLine, contextFile, contextMimeType, contextLink);
+      return result.caption;
+  }, [generateSocialPostDetails]);
+
+  const generateSocialImage = useCallback(async (prompt: string) => {
+      try {
+          const ai = getAiInstance();
+          // Note: 'gemini-2.5-flash-image' (nano banana) for general image generation
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash-image',
+              contents: {
+                  parts: [{ text: prompt }]
+              },
+              config: {
+                  responseModalities: [GeminiModality.IMAGE]
+              }
+          });
+          
+          // Extract base64 image
+          const part = response.candidates?.[0]?.content?.parts?.[0];
+          if (part && part.inlineData) {
+              return `data:image/png;base64,${part.inlineData.data}`;
+          }
+          return null;
+      } catch (e) {
+          console.error("Error generating social image:", e);
+          return null;
+      }
+  }, []);
+
+  const generateSocialVideo = useCallback(async (prompt: string) => {
+      try {
+          const videoUrl = await generateVideos(prompt);
+          return videoUrl;
+      } catch (e) {
+          console.error("Error generating video:", e);
+          return null;
+      }
+  }, []);
+
+  // CHAT-TO-CALENDAR (Gemini Intelligence)
+  const generateSocialCalendarFromChat = useCallback(async (businessLine: BusinessLine, chatInput: string) => {
+    try {
+        const ai = getAiInstance();
+        // Using Flash for speed, or Pro if we want high reasoning.
+        const systemPrompt = `You are Walter, the Digital Campaign Engine for "${businessLine.name}" (${businessLine.description}).
+        
+        USER REQUEST: "${chatInput}"
+
+        YOUR JOB:
+        1.  **Analyze & Infer**: From the user's natural language request, infer the Campaign Duration (e.g., 2 weeks, 1 month), the Goal, the Target Audience, and the Best Channels.
+        2.  **Strategize**: Plan a content calendar that fits this inference.
+        3.  **Generate**: Return a JSON array of posts.
+
+        SCHEMA:
+        Array of objects:
+        {
+            "date": "YYYY-MM-DD" (start from tomorrow),
+            "channel": "string" (e.g., "LinkedIn", "Instagram"),
+            "content": "string" (caption),
+            "type": "Post" | "Reel" | "Story",
+            "engagementHook": "string" (first line hook),
+            "cta": "string" (call to action),
+            "imagePrompt": "string" (visual description for Nano Banana)
+        }
+        `;
+        
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: systemPrompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: GeminiType.ARRAY,
+                    items: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            date: { type: GeminiType.STRING },
+                            channel: { type: GeminiType.STRING },
+                            content: { type: GeminiType.STRING },
+                            type: { type: GeminiType.STRING, enum: ["Post", "Reel", "Story", "Idea"] },
+                            engagementHook: { type: GeminiType.STRING },
+                            cta: { type: GeminiType.STRING },
+                            imagePrompt: { type: GeminiType.STRING }
+                        },
+                        required: ["date", "channel", "content", "type", "engagementHook", "cta", "imagePrompt"]
+                    }
+                }
+            }
+        });
+        
+        return JSON.parse(response.text.trim());
+    } catch (e) {
+        console.error("Error generating calendar from chat:", e);
+        return [];
+    }
+  }, []);
+
+  const generateSocialCalendar = useCallback(async (businessLine: BusinessLine, duration: string, goal: string, contextFile?: string, contextMimeType?: string, contextLink?: string) => {
+      // Legacy function wrapper - redirects to the Chat engine logic if needed, or keeps structured.
+      // For consistency with the new "Digital Campaign Engine", we can just construct a prompt and use the same logic,
+      // OR keep this structured one. The prompt requested replacing the form with chat, so this might become deprecated or internal helper.
+      // But for now, let's keep it as a fallback or structured entry point.
+      
+      const chatEquivalent = `Create a ${duration} campaign for ${goal}. ${contextLink ? `Refer to ${contextLink}` : ''}`;
+      // Note: We can't easily pass file to the Chat function unless we update it.
+      // Let's leave this as is for now but ensure it uses smart inference too.
+       try {
+        const ai = getAiInstance();
+        let systemPrompt = `You are a Digital Campaign Engine and Senior Social Strategist for "${businessLine.name}" (${businessLine.description}).
+        
+        CAMPAIGN BRIEF:
+        - Duration: ${duration}
+        - Goal & Context: ${goal}
+        ${contextLink ? `- Reference Link: ${contextLink}` : ''}
+
+        YOUR JOB:
+        1. Infer the Target Audience and Best Channels based on the business and goal.
+        2. Generate a strategic content calendar.
+        3. For each post, provide:
+           - Date (starting tomorrow)
+           - Channel (e.g. LinkedIn, Instagram, TikTok - inferred from strategy)
+           - Content (Caption/Script)
+           - Type (Post, Reel, Story)
+           - Engagement Hook (First sentence/visual hook)
+           - Call to Action (CTA)
+           - Visual Prompt (Detailed prompt for Nano Banana AI to generate the image)
+
+        Create enough posts to fill the duration (e.g., 3-5 per week).
+        `;
+        
+        const parts: any[] = [{ text: systemPrompt }];
+
+        if (contextFile && contextMimeType) {
+             parts.unshift({
+                inlineData: {
+                    mimeType: contextMimeType,
+                    data: contextFile
+                }
+            });
+        }
+        
+        const response = await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash', 
+            contents: { parts },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: GeminiType.ARRAY,
+                    items: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            date: { type: GeminiType.STRING },
+                            channel: { type: GeminiType.STRING },
+                            content: { type: GeminiType.STRING },
+                            type: { type: GeminiType.STRING, enum: ["Post", "Reel", "Story", "Idea"] },
+                            engagementHook: { type: GeminiType.STRING },
+                            cta: { type: GeminiType.STRING },
+                            imagePrompt: { type: GeminiType.STRING }
+                        },
+                        required: ["date", "channel", "content", "type", "engagementHook", "cta", "imagePrompt"]
+                    }
+                }
+            }
+        });
+        
+        return JSON.parse(response.text.trim());
+    } catch (e) {
+        console.error("Error generating calendar:", e);
+        return [];
+    }
+  }, []);
+
+
+  // Updated Pulse/Prospects with Search Grounding
+  const findProspects = useCallback(async (businessLine: BusinessLine, prompt: string) => { 
+      try {
+        const searchQuery = `Find potential clients for a "${businessLine.name}" business (${businessLine.description}). Criteria: ${prompt}. Return list with names and likely needs.`;
+        const rawResult = await generateContentWithSearch(searchQuery);
+        
+        // We need to structure this text back into JSON. A two-step process or structured prompt with search is ideal.
+        // For simplicity in this hook, we'll ask Gemini to format the *search result* into JSON.
+        const ai = getAiInstance();
+        const formatPrompt = `Extract a list of prospects from this research text. Return JSON: { "prospects": [{ "name": string, "likelyNeed": string }], "sources": [{ "title": string, "uri": string }] }
+        
+        RESEARCH TEXT:
+        ${rawResult}`;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: formatPrompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        
+        return JSON.parse(response.text.trim());
+      } catch (e) {
+          console.error("Prospect search error", e);
+          return { prospects: [], sources: [] };
+      }
+  }, []);
+
+  const getClientPulse = useCallback(async (client: Client, filters: FilterOptions, customPrompt?: string) => {
+       try {
+        const query = customPrompt || `Latest news, social media mentions, or public updates about "${client.name}". Timeframe: ${filters.timeframe}. Location: ${filters.location}.`;
+        const rawResult = await generateContentWithSearch(query);
+        
+        const ai = getAiInstance();
+        const formatPrompt = `Extract key updates from this text into a JSON array of objects: { "source": "News" | "Social Media", "content": string, "url": string, "date": string }.
+        
+        TEXT: ${rawResult}`;
+
+         const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: formatPrompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        return JSON.parse(response.text.trim());
+       } catch (e) {
+           return [];
+       }
+  }, []);
+  
+  const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: FilterOptions, customPrompt?: string) => {
+       try {
+        const query = customPrompt || `Key competitors for "${businessLine.name}" in ${filters.location} and their recent activities or customer trends.`;
+        const rawResult = await generateContentWithSearch(query);
+        
+        const ai = getAiInstance();
+        const formatPrompt = `Extract competitor insights and search trends from this text. Return JSON: { "insights": [{"competitorName": string, "insight": string, "source": string}], "trends": [{"keyword": string, "insight": string}] }
+        
+        TEXT: ${rawResult}`;
+
+         const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: formatPrompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        return JSON.parse(response.text.trim());
+       } catch (e) {
+           return { insights: [], trends: [] };
+       }
+  }, []);
 
   // Placeholder functions for missing ones to avoid errors during compilation if not imported
   const generateDocumentDraft = useCallback(async (prompt: string, category: DocumentCategory, owner: BusinessLine | Client | Deal | Project, ownerType: DocumentOwnerType) => {
@@ -441,7 +810,6 @@ CONTEXT:
       updateDeal(id, { amountPaid: (deals.find(d => d.id === id)?.amountPaid || 0) + amount });
   }, [deals, updateDeal]);
   
-  const findProspects = useCallback(async (businessLine: BusinessLine, prompt: string) => { return { prospects: [], sources: [] }; }, []);
   const findProspectsByName = useCallback(async (data: { businessLineName: string }) => { return ""; }, []);
   const generateNextTaskFromSubtask = useCallback(async (taskId: string, subTaskId: string) => {}, []);
   const toggleSubTask = useCallback((taskId: string, subTaskId: string) => {
@@ -461,14 +829,14 @@ CONTEXT:
   const getOpportunities = useCallback(async (businessLine: BusinessLine, expand: boolean) => { return { opportunities: [], sources: [] }; }, []);
   const getClientOpportunities = useCallback(async (client: Client) => { return { opportunities: [], sources: [] }; }, []);
   const getDealOpportunities = useCallback(async (deal: Deal) => { return { opportunities: [], sources: [] }; }, []);
-  const getClientPulse = useCallback(async (client: Client, filters: FilterOptions, customPrompt?: string) => { return []; }, []);
-  const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: FilterOptions, customPrompt?: string) => { return { insights: [], trends: [] }; }, []);
   const generateDocumentFromSubtask = useCallback(async (task: Task, subtaskText: string) => { return null; }, []);
   const getPlatformInsights = useCallback(() => { return []; }, []);
   const updateTask = useCallback((id: string, data: any) => {
        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
   }, [setTasks]);
-  const promoteSubtaskToTask = useCallback(() => {}, []);
+  const promoteSubtaskToTask = useCallback((taskId: string, subTaskId: string) => {
+    // Implementation logic would go here
+  }, []);
   const researchSubtask = useCallback(async (query: string, context: string) => { return ""; }, []);
   const refineTaskChecklist = useCallback(async (taskId: string, command: string) => {}, []);
   const getPlatformQueryResponse = useCallback(async () => { return ""; }, []);
@@ -493,6 +861,10 @@ CONTEXT:
   }, [setDocuments]);
   
   const addCRMEntryFromVoice = useCallback((data: any) => { return ""; }, []);
+  const deleteTask = useCallback((id: string) => {
+      setTasks(prev => prev.filter(t => t.id !== id));
+  }, [setTasks]);
+
 
   return {
     tasks,
@@ -505,6 +877,7 @@ CONTEXT:
     crmEntries,
     teamMembers,
     contacts,
+    socialPosts, // Export social posts state
     addTask,
     addBusinessLine,
     updateBusinessLine,
@@ -521,6 +894,15 @@ CONTEXT:
     addDocument,
     addContact,
     deleteContact,
+    addSocialPost, // Export social methods
+    updateSocialPost,
+    deleteSocialPost,
+    generateSocialPostContent,
+    generateSocialImage,
+    generateSocialVideo, // Export Veo
+    generateSocialCalendar,
+    generateSocialCalendarFromChat, // Export Chat-to-Calendar
+    generateSocialPostDetails, // Export new function
     updateClientFromInteraction, approveClientUpdate, clearProposedClientUpdate,
     updateDealFromInteraction, approveDealUpdate, clearProposedDealUpdate,
     updateProjectFromInteraction, approveProjectUpdate, clearProposedProjectUpdate,
@@ -556,5 +938,7 @@ CONTEXT:
     logEmailToCRM,
     inviteMember,
     generateMeetingTranscript,
+    generateLeadScore,
+    deleteTask
   };
 };

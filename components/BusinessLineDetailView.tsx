@@ -12,6 +12,7 @@ import ProspectsView from './ProspectsView';
 import RevenueView from './RevenueView';
 import SocialMediaIdeas from './SocialMediaIdeas';
 import CompetitorsView from './CompetitorsView';
+import SocialMediaTab from './SocialMediaTab';
 
 interface BusinessLineDetailViewProps {
   businessLine: BusinessLine;
@@ -25,9 +26,10 @@ interface BusinessLineDetailViewProps {
   onSelectClient: (id: string) => void;
   onSelectDeal: (id: string) => void;
   onSelectTask: (task: Task) => void;
+  initialTab?: string;
 }
 
-type BusinessLineTab = 'Overview' | 'Work' | 'Clients' | 'Revenue' | 'Prospects' | 'Playbook' | 'Documents' | 'Revenue Ideas' | 'Competitors';
+type BusinessLineTab = 'Overview' | 'Work' | 'Clients' | 'Revenue' | 'Prospects' | 'Playbook' | 'Documents' | 'Social Media' | 'Competitors';
 
 const EditIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>);
 
@@ -118,9 +120,13 @@ const EditableField: React.FC<{
 };
 
 const BusinessLineDetailView: React.FC<BusinessLineDetailViewProps> = (props) => {
-  const { businessLine, onBack } = props;
-  const [activeTab, setActiveTab] = useState<BusinessLineTab>('Overview');
+  const { businessLine, onBack, initialTab } = props;
+  const [activeTab, setActiveTab] = useState<BusinessLineTab>((initialTab as BusinessLineTab) || 'Overview');
   
+  useEffect(() => {
+      if (initialTab) setActiveTab(initialTab as BusinessLineTab);
+  }, [initialTab]);
+
   const tabContent = () => {
     switch (activeTab) {
       case 'Overview': return <OverviewTab {...props} />;
@@ -130,7 +136,7 @@ const BusinessLineDetailView: React.FC<BusinessLineDetailViewProps> = (props) =>
       case 'Prospects': return <ProspectsView businessLine={businessLine} kanbanApi={props.kanbanApi} />;
       case 'Playbook': return <PlaybookTab {...props} />;
       case 'Documents': return <DocumentsTab {...props} />;
-      case 'Revenue Ideas': return <RevenueIdeasTab {...props} />;
+      case 'Social Media': return <SocialMediaTab businessLine={businessLine} kanbanApi={props.kanbanApi} />;
       case 'Competitors': return <CompetitorsView businessLine={props.businessLine} kanbanApi={props.kanbanApi} />;
       default: return null;
     }
@@ -150,7 +156,7 @@ const BusinessLineDetailView: React.FC<BusinessLineDetailViewProps> = (props) =>
             </div>
         </div>
       <Tabs
-        tabs={['Overview', 'Work', 'Clients', 'Revenue', 'Prospects', 'Playbook', 'Documents', 'Revenue Ideas', 'Competitors']}
+        tabs={['Overview', 'Work', 'Clients', 'Revenue', 'Social Media', 'Prospects', 'Playbook', 'Documents', 'Competitors']}
         activeTab={activeTab}
         setActiveTab={setActiveTab as (tab: string) => void}
       />
@@ -309,102 +315,6 @@ const DocumentsTab: React.FC<BusinessLineDetailViewProps> = ({ documents, busine
         onDeleteDocument={kanbanApi.deleteDocument}
     />
 );
-
-const RevenueIdeasTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, deals, kanbanApi }) => {
-    const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-    const [opportunitySources, setOpportunitySources] = useState<any[]>([]);
-    const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
-    
-    const totalRevenue = deals.filter(d => d.status === 'Closed - Won').reduce((sum, deal) => sum + deal.value, 0);
-
-    const handleGetOpportunities = async (expand = false) => {
-        setIsLoadingOpportunities(true);
-        const { opportunities: result, sources } = await kanbanApi.getOpportunities(businessLine, expand);
-        setOpportunities(result);
-        setOpportunitySources(sources);
-        setIsLoadingOpportunities(false);
-    };
-
-    const handleAddOpportunityAsTask = (opportunityText: string) => {
-        kanbanApi.addTask({
-            title: opportunityText,
-            businessLineId: businessLine.id,
-        });
-    };
-
-    const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
-
-    return (
-        <div className="space-y-6">
-            <div className="bg-green-50 p-4 rounded-xl border border-green-200">
-                <h3 className="text-sm font-semibold text-green-800 uppercase tracking-wider">Total Revenue Earned</h3>
-                <p className="text-3xl font-bold text-brevo-text-primary">${totalRevenue.toLocaleString()}</p>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
-                <h3 className="text-xl font-semibold text-brevo-text-primary mb-4">Growth Opportunities</h3>
-                <div className="flex space-x-4">
-                    <button 
-                        onClick={() => handleGetOpportunities(false)} 
-                        disabled={isLoadingOpportunities}
-                        className="bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300"
-                    >
-                        {isLoadingOpportunities ? 'Analyzing...' : 'Ask AI for ideas'}
-                    </button>
-                    {opportunities.length > 0 && (
-                        <button 
-                            onClick={() => handleGetOpportunities(true)} 
-                            disabled={isLoadingOpportunities}
-                            className="bg-gray-200 hover:bg-gray-300 text-brevo-text-primary font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300"
-                        >
-                            {isLoadingOpportunities ? 'Expanding...' : 'Get more ideas'}
-                        </button>
-                    )}
-                </div>
-                {opportunities.length > 0 && (
-                    <div className="mt-6 bg-gray-50 p-4 rounded-md border border-gray-200">
-                        <h4 className="font-semibold text-lg text-green-700 mb-3">Here are some ideas:</h4>
-                        <ul className="space-y-3">
-                        {opportunities.map(opp => (
-                            <li key={opp.id} className="flex items-center justify-between text-brevo-text-secondary">
-                                <span>- {opp.text}</span>
-                                <button
-                                    onClick={() => handleAddOpportunityAsTask(opp.text)}
-                                    className="flex items-center text-sm bg-gray-200 hover:bg-gray-300 text-brevo-text-primary font-semibold py-1 px-2 rounded-md transition-colors"
-                                >
-                                    <PlusIcon />
-                                    Add task
-                                </button>
-                            </li>
-                        ))}
-                        </ul>
-                        {opportunitySources.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                                <h5 className="text-xs font-semibold uppercase text-brevo-text-secondary tracking-wider">Sources from Walter's Research</h5>
-                                <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                                    {opportunitySources.map((source: any, index: number) => (
-                                        <li key={source.uri || index} className="text-blue-600 truncate">
-                                            <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline" title={source.uri}>
-                                                {source.title || source.uri}
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            <SocialMediaIdeas businessLine={businessLine} kanbanApi={kanbanApi} />
-
-            <MarketingCollateralGenerator
-                owner={businessLine}
-                kanbanApi={kanbanApi}
-            />
-        </div>
-    );
-};
 
 
 export default BusinessLineDetailView;

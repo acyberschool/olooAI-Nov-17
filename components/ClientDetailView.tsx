@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Client, Task, Deal, Opportunity, Document, BusinessLine, CRMEntry, Suggestion, Project, Contact } from '../types';
+import { Client, Task, Deal, Opportunity, Document, BusinessLine, CRMEntry, Suggestion, Project, Contact, UniversalInputContext } from '../types';
 import KanbanBoard from './KanbanBoard';
 import { useKanban } from '../hooks/useKanban';
 import DocumentManager from './DocumentManager';
 import MarketingCollateralGenerator from './MarketingCollateralGenerator';
 import CRMIcon from './CRMIcon';
 import Tabs from './Tabs';
-import { UniversalInputContext } from '../App';
 import ClientPulseView from './ClientPulseView';
 import EmailClientModal from './EmailClientModal';
 import ContextualWalter from './ContextualWalter';
@@ -152,10 +151,18 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
                  <button onClick={onBack} className="text-sm text-brevo-cta hover:underline font-medium mb-2">
                     &larr; Back to all Clients
                 </button>
-                <EditableTitle 
-                    value={client.name} 
-                    onSave={(val) => props.kanbanApi.updateClient(client.id, { name: val })}
-                />
+                <div className="flex items-center gap-4">
+                    <EditableTitle 
+                        value={client.name} 
+                        onSave={(val) => props.kanbanApi.updateClient(client.id, { name: val })}
+                    />
+                    {client.leadScore !== undefined && (
+                        <span className={`text-sm font-bold rounded-full px-3 py-1 ${client.leadScore >= 80 ? 'bg-green-100 text-green-800' : client.leadScore >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                            Score: {client.leadScore}
+                        </span>
+                    )}
+                </div>
+                
                 <div className="flex items-center space-x-2 mt-2">
                     <span className="text-sm text-brevo-text-secondary">Part of:</span>
                     <select 
@@ -202,7 +209,16 @@ const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBac
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
-                <h2 className="text-xl font-semibold text-brevo-text-primary mb-4">Summary</h2>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold text-brevo-text-primary">Summary</h2>
+                    {client.leadScore !== undefined && (
+                        <div className="text-right">
+                            <p className="text-xs text-gray-500 uppercase font-bold">Lead Score</p>
+                            <p className="text-2xl font-bold text-brevo-text-primary">{client.leadScore}/100</p>
+                            <p className="text-xs text-gray-500 italic max-w-xs">{client.leadScoreReason}</p>
+                        </div>
+                    )}
+                </div>
                 <div className="space-y-4">
                     <EditableField 
                         label="Who they are"

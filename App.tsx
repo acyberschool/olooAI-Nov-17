@@ -14,7 +14,7 @@ import CRMView from './components/CRMView';
 import TasksView from './components/TasksView';
 import TaskDetailModal from './components/TaskDetailModal';
 import { useVoiceAssistant } from './hooks/useVoiceAssistant';
-import { Task } from './types';
+import { Task, UniversalInputContext } from './types';
 import TeamView from './components/TeamView';
 import UniversalInputModal from './components/UniversalInputModal';
 import DataInsightsView from './components/DataInsightsView';
@@ -49,14 +49,6 @@ export const trackEvent = (action: string, category: string, label: string, valu
 }
 
 export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'projects' | 'crm' | 'team' | 'data' | 'settings';
-export type UniversalInputContext = {
-    clientId?: string;
-    dealId?: string;
-    businessLineId?: string;
-    task?: Task;
-    placeholder?: string;
-    date?: Date;
-};
 
 const MenuIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -104,6 +96,7 @@ export default function App() {
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [initialDetailTab, setInitialDetailTab] = useState<string | undefined>(undefined);
   
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [lastInteraction, setLastInteraction] = useState({ user: '', assistant: '' });
@@ -182,6 +175,7 @@ export default function App() {
     setSelectedDealId(null);
     setSelectedProjectId(null);
     setSelectedTask(null);
+    setInitialDetailTab(undefined);
   }
 
   const handleSetView = (view: View) => {
@@ -191,11 +185,12 @@ export default function App() {
     setIsSidebarOpen(false); // Close sidebar on navigation change
   }
 
-  const handleSelectBusinessLine = (id: string) => {
+  const handleSelectBusinessLine = (id: string, tab?: string) => {
     trackEvent('select', 'BusinessLine', id);
     clearSelections();
     setActiveView('businessLines');
     setSelectedBusinessLineId(id);
+    if (tab) setInitialDetailTab(tab);
   };
 
   const handleSelectClient = (id: string) => {
@@ -314,6 +309,7 @@ export default function App() {
                 onSelectDeal={handleSelectDeal}
                 onSelectTask={handleSelectTask}
                 onBack={() => handleSetView('businessLines')}
+                initialTab={initialDetailTab}
             />;
         }
     }
@@ -446,11 +442,11 @@ export default function App() {
           <UniversalInputModal 
             isOpen={isUniversalInputOpen}
             onClose={() => setIsUniversalInputOpen(false)}
-            onSave={(text) => {
+            onSave={(text, file) => {
                 if (universalInputContext.date) {
                     kanban.addTask({ title: text, dueDate: universalInputContext.date.toISOString() });
                 } else {
-                    kanban.processTextAndExecute(text, universalInputContext)
+                    kanban.processTextAndExecute(text, universalInputContext, file)
                 }
             }}
             context={universalInputContext}

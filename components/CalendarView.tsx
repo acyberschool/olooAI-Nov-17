@@ -1,7 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
-import { Task, BusinessLine, Client, Deal } from '../types';
+import { Task, BusinessLine, Client, Deal, UniversalInputContext } from '../types';
 import TaskCard from './TaskCard';
-import { UniversalInputContext } from '../App';
 
 interface CalendarViewProps {
   tasks: Task[];
@@ -71,7 +71,7 @@ const CalendarView: React.FC<CalendarViewProps> = (props) => {
       const dateForTask = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
       props.onOpenUniversalInput({
           date: dateForTask,
-          placeholder: `Create a new task for ${dateForTask.toLocaleDateString()}...`
+          placeholder: `Create a new task for ${dateForTask.toLocaleDateString()} (e.g., "Meeting with Client X")...`
       });
   }
 
@@ -126,6 +126,12 @@ const CalendarView: React.FC<CalendarViewProps> = (props) => {
               <h3 className="text-lg font-semibold text-brevo-text-primary mb-4">
                   Tasks for {selectedDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
               </h3>
+              <button 
+                onClick={() => handleCreateTaskForDate(selectedDate.getDate())}
+                className="w-full mb-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-brevo-cta hover:text-brevo-cta transition-colors flex items-center justify-center text-sm font-medium"
+              >
+                  + Add Task
+              </button>
               <div className="space-y-4">
                 {tasksForSelectedDate.length > 0 ? (
                     tasksForSelectedDate.map(task => (

@@ -54,6 +54,90 @@ export function createPcmBlob(data: Float32Array): GeminiBlob {
     };
 }
 
+// --- Extended Gemini Capabilities ---
+
+export async function generateContentWithSearch(prompt: string): Promise<string> {
+    const ai = getAiInstance();
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                responseMimeType: 'application/json' // Expecting structured return usually
+            }
+        });
+        return response.text || "No results found.";
+    } catch (e) {
+        console.error("Search Grounding Error:", e);
+        throw e;
+    }
+}
+
+export async function generateVideos(prompt: string): Promise<string | null> {
+    const ai = getAiInstance();
+    try {
+        // Veo 3.1 generation
+        let operation = await ai.models.generateVideos({
+            model: 'veo-3.1-fast-generate-preview',
+            prompt: prompt,
+            config: {
+                numberOfVideos: 1,
+                resolution: '720p',
+                aspectRatio: '16:9' // Default social format
+            }
+        });
+
+        // Poll for completion (simplified for this context, usually takes time)
+        // In a real app, we'd handle this async with a job queue or long polling loop.
+        // For this demo, we attempt to get the operation result after a short delay
+        // acknowledging that real video gen takes > 10s.
+        
+        // Since we can't block effectively here for too long without UX impact,
+        // we will assume this is handled by a backend or use a simplified flow.
+        // However, per docs:
+        while (!operation.done) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2s
+            operation = await ai.operations.getVideosOperation({ operation: operation });
+        }
+
+        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (videoUri) {
+             // Append API Key to fetch the actual bytes if needed, or just return URI for display if supported
+             // Note: Browser might not be able to fetch directly due to CORS.
+             // We will return the URI with the key appended for the frontend to try and use.
+             return `${videoUri}&key=${process.env.API_KEY}`; 
+        }
+        return null;
+
+    } catch (e) {
+        console.error("Video Generation Error:", e);
+        return null;
+    }
+}
+
+export async function generateSpeech(text: string): Promise<string | null> {
+    const ai = getAiInstance();
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: text }] }],
+            config: {
+                responseModalities: [GeminiModality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: 'Kore' },
+                    },
+                },
+            },
+        });
+        return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+    } catch (e) {
+        console.error("TTS Error:", e);
+        return null;
+    }
+}
+
 
 // --- Function Calling Schemas ---
 

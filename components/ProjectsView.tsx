@@ -1,6 +1,6 @@
+
 import React from 'react';
-import { Project, Client } from '../types';
-import { UniversalInputContext } from '../App';
+import { Project, Client, UniversalInputContext } from '../types';
 
 interface ProjectsViewProps {
   projects: Project[];

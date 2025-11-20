@@ -81,6 +81,9 @@ export interface Client {
   proposedLastTouchSummary?: string;
   proposedNextAction?: string;
   proposedNextActionDueDate?: string;
+  // Lead Scoring
+  leadScore?: number;
+  leadScoreReason?: string;
 }
 
 export interface Deal {
@@ -225,6 +228,21 @@ export interface PlatformInsight {
     text: string;
 }
 
+export interface SocialPost {
+    id: string;
+    businessLineId: string;
+    date: string; // ISO Date String YYYY-MM-DD
+    content: string; // The caption or text
+    type: 'Post' | 'Idea' | 'Prompt';
+    imageUrl?: string; // Base64 or URL
+    videoUrl?: string; // URL for generated video
+    imagePrompt?: string;
+    status: 'Draft' | 'Scheduled' | 'Posted';
+    channel?: string;
+    cta?: string;
+    engagementHook?: string;
+}
+
 // --- AI Router Brain Types ---
 export interface RouterTask {
   title: string;
@@ -240,14 +258,32 @@ export interface RouterNote {
 }
 
 export interface RouterBrainResult {
-  action: 'create_task' | 'create_note' | 'both' | 'update_task' | 'ignore' | 'create_business_line' | 'create_client' | 'create_deal';
+  action: 'create_task' | 'create_note' | 'both' | 'update_task' | 'ignore' | 'create_business_line' | 'create_client' | 'create_deal' | 'create_project';
   tasks: RouterTask[];
   note: RouterNote | null;
   summary: string | null;
   businessLine?: Omit<BusinessLine, 'id'>;
   client?: Omit<Client, 'id' | 'businessLineId'> & { businessLineName?: string };
   deal?: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string };
+  project?: {
+      partnerName: string;
+      projectName: string;
+      goal: string;
+      dealType: ProjectDealType;
+      expectedRevenue: number;
+      impactMetric: string;
+      stage: ProjectStage;
+  };
 }
+
+export type UniversalInputContext = {
+    clientId?: string;
+    dealId?: string;
+    businessLineId?: string;
+    task?: Task;
+    placeholder?: string;
+    date?: Date;
+};
 
 
 // --- Gemini Types from @google/genai ---
