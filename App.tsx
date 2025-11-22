@@ -316,7 +316,7 @@ export default function App() {
     
     switch (activeView) {
       case 'settings':
-        return <SettingsView />;
+        return <SettingsView kanbanApi={kanban} />;
       case 'data':
         return <DataInsightsView kanbanApi={kanban} />;
       case 'team':
