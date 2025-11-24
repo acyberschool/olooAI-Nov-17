@@ -1110,7 +1110,10 @@ CONTEXT:
       if (data.imagePrompt) payload.image_prompt = data.imagePrompt;
       if (data.status) payload.status = data.status;
       if (data.channel) payload.channel = data.channel;
-      // ... map others
+      if (data.cta) payload.cta = data.cta;
+      if (data.engagementHook) payload.engagement_hook = data.engagementHook;
+      if (data.type) payload.type = data.type;
+      if (data.date) payload.date = data.date;
 
       const { error } = await supabase.from('social_posts').update(payload).eq('id', id);
 
