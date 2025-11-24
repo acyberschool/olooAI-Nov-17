@@ -173,6 +173,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     onClose(); 
   }
 
+  const handleDelete = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+          kanbanApi.deleteTask(task.id);
+          onClose();
+      }
+  }
+
   const handleAddNote = () => {
     if (task.clientId) {
       onOpenUniversalInput({
@@ -272,9 +280,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         </div>
         
         {isEditing ? (
-             <div className="flex justify-end space-x-2">
-                <button onClick={(e) => { e.stopPropagation(); setIsEditing(false); }} className="py-2 px-4 rounded-lg text-brevo-text-primary hover:bg-gray-100">Cancel</button>
-                <button onClick={handleSave} className="py-2 px-4 rounded-lg bg-brevo-cta hover:bg-brevo-cta-hover text-white font-semibold">Save Changes</button>
+             <div className="flex justify-between items-center pt-4 border-t border-brevo-border">
+                <button 
+                    onClick={handleDelete} 
+                    className="py-2 px-4 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 font-semibold text-sm"
+                >
+                    Delete Task
+                </button>
+                <div className="flex space-x-2">
+                    <button onClick={(e) => { e.stopPropagation(); setIsEditing(false); }} className="py-2 px-4 rounded-lg text-brevo-text-primary hover:bg-gray-100">Cancel</button>
+                    <button onClick={handleSave} className="py-2 px-4 rounded-lg bg-brevo-cta hover:bg-brevo-cta-hover text-white font-semibold">Save Changes</button>
+                </div>
             </div>
         ) : (
             <div className="border-t border-brevo-border pt-6">
