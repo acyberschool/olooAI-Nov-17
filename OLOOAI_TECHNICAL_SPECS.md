@@ -37,7 +37,7 @@ The `useKanban` hook serves as the **global store** for the application.
 ### 2.3 Universal Input & The "Router Brain"
 The core differentiator of the platform is `UniversalInputModal.tsx`.
 *   **Flow:** User Input (Text/Voice) -> `services/routerBrainService.ts` -> Gemini Flash 2.5.
-*   **Logic:** The AI classifies the intent into specific actions (`create_task`, `create_deal`, etc.) and returns a structured JSON object enforced by `responseSchema`.
+*   **Logic:** The AI classifies the intent into specific actions (`create_task`, `create_deal`, `create_event`, etc.) and returns a structured JSON object enforced by `responseSchema`.
 *   **Execution:** The `useKanban` hook receives this JSON and dispatches the corresponding Supabase `insert/update` calls.
 
 ---
@@ -53,7 +53,7 @@ Implements the Gemini **Live API** over WebSockets.
 *   **Tool Use:** The model is configured with `functionDeclarations` (e.g., `createBoardItem`). When the model predicts a tool call, the frontend executes the JS function and returns the result to the model via `session.sendToolResponse`.
 
 ### 3.2 Generative Logic
-*   **Router Brain:** `gemini-2.5-flash`. Uses 1-shot prompting to map natural language to database schema.
+*   **Router Brain:** `gemini-2.5-flash`. Uses 1-shot prompting to map natural language to database schema. It supports **Action Cascading**, creating multiple tasks from a single intent.
 *   **Content Generation:**
     *   **Text:** `gemini-2.5-flash` (Marketing copy, emails).
     *   **Images:** `gemini-2.5-flash-image` (Social media posts).

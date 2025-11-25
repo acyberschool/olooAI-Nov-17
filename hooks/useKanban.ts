@@ -45,10 +45,11 @@ export const useKanban = () => {
                   .is('user_id', null);
 
               if (updateError) {
-                  console.warn("Notice: Could not automatically link invites (RLS or no invites). Details:", JSON.stringify(updateError));
+                  // Swallow RLS errors safely to prevent UI crash if no invites exist
+                  console.warn("Invite check safe fail:", updateError.message);
               }
           } catch (e) {
-              console.warn("Invite check skipped due to error:", e);
+              // Ignore network issues during invite check
           }
 
           // B. Fetch Memberships
@@ -74,7 +75,7 @@ export const useKanban = () => {
                   setCurrentUserMember(newMember);
               }
           } else {
-              // Use first org found (Multi-org support can be added here later by letting user select)
+              // Use first org found
               const activeMember = members[0];
               setOrganization(activeMember.organizations as any);
               setCurrentUserMember(activeMember as any);
@@ -115,12 +116,11 @@ export const useKanban = () => {
   }, [orgId]);
 
 
-  // --- CRUD ACTIONS (Enhanced with organization_id) ---
+  // --- CRUD ACTIONS ---
 
   const addTask = useCallback(async (itemData: Partial<Task> & { itemType?: TaskType, title: string, businessLineName?: string }) => {
     if (!orgId) return "No organization found";
     
-    // Resolve Business Line
     let businessLineId = itemData.businessLineId;
     if (!businessLineId && itemData.businessLineName) {
         const businessLine = businessLines.find(bl => bl.name.toLowerCase() === itemData.businessLineName?.toLowerCase());
@@ -181,8 +181,6 @@ export const useKanban = () => {
       setClients(prev => prev.filter(c => c.id !== id));
   }, []);
 
-  // --- Real Implementations for Previously Stubbed Functions ---
-
   const addBusinessLine = useCallback(async (data: any) => {
       if (!orgId) return "Error";
       const payload = { ...data, organization_id: orgId };
@@ -196,15 +194,11 @@ export const useKanban = () => {
 
   const addDeal = useCallback(async (data: any) => {
       if (!orgId) return "Error";
-      
-      // Resolve Client ID from Name if needed
       let clientId = data.clientId;
       if (!clientId && data.clientName) {
           const client = clients.find(c => c.name.toLowerCase() === data.clientName.toLowerCase());
           clientId = client?.id;
       }
-      
-      // Resolve Business Line if missing but client exists
       let businessLineId = data.businessLineId;
       if (!businessLineId && clientId) {
           const client = clients.find(c => c.id === clientId);
@@ -221,36 +215,29 @@ export const useKanban = () => {
           status: 'Open',
           amount_paid: 0
       };
-      
-      // Remove non-DB fields
       delete payload.clientName;
 
       const { data: inserted, error } = await supabase.from('deals').insert(payload).select().single();
       if (!error && inserted) {
           setDeals(prev => [inserted as Deal, ...prev]);
-          return `Deal "${inserted.name}" created for ${data.clientName || 'client'}.`;
+          return `Deal "${inserted.name}" created.`;
       }
-      console.error(error);
       return "Failed to create deal.";
   }, [orgId, clients]);
 
   const addProject = useCallback(async (data: any) => {
       if (!orgId) return "Error";
-      
-      // Attempt to match partner name to existing client
       let clientId = data.clientId;
       if (!clientId && data.partnerName) {
            const client = clients.find(c => c.name.toLowerCase().includes(data.partnerName.toLowerCase()));
            clientId = client?.id;
       }
-
       const payload = {
           ...data,
           client_id: clientId,
           organization_id: orgId,
           stage: data.stage || 'Lead'
       };
-
       const { data: inserted, error } = await supabase.from('projects').insert(payload).select().single();
       if (!error && inserted) {
           setProjects(prev => [inserted as Project, ...prev]);
@@ -263,26 +250,22 @@ export const useKanban = () => {
       if (!orgId) return;
       const payload = {
           ...entry,
-          client_id: entry.clientId, // Ensure mapping from JS camelCase to snake_case if needed, but supabase-js handles strict matching usually
+          client_id: entry.clientId,
           deal_id: entry.dealId,
           project_id: entry.projectId,
           organization_id: orgId,
           created_at: new Date().toISOString()
       };
-      
-      // Clean up undefineds
       if (!payload.deal_id) delete payload.deal_id;
       if (!payload.project_id) delete payload.project_id;
 
       const { data: inserted, error } = await supabase.from('crm_entries').insert(payload).select().single();
       if (!error && inserted) {
           setCrmEntries(prev => [inserted as CRMEntry, ...prev]);
-      } else {
-          console.error("CRM Entry Error:", error);
       }
   }, [orgId]);
 
-  // --- Event & HR ---
+  // --- Event & HR (Real Implementation) ---
 
   const addEvent = useCallback(async (data: Partial<Event>) => {
       if (!orgId) return;
@@ -335,7 +318,6 @@ export const useKanban = () => {
       setTasks(prev => prev.filter(t => t.id !== id));
   }
 
-  // Helper for legacy props
   const updateTaskStatusById = (id: string, status: KanbanStatus) => updateTask(id, { status });
 
   const updateTaskStatusByTitle = useCallback(async (title: string, status: string) => {
@@ -358,21 +340,22 @@ export const useKanban = () => {
 
       // 1. Tasks
       if (result.action === 'create_task' || result.action === 'both') {
-          result.tasks.forEach(t => addTask({ title: t.title, dueDate: t.due_date || undefined }));
+          result.tasks.forEach(t => addTask({ 
+              title: t.title, 
+              dueDate: t.due_date || undefined,
+              priority: t.priority || 'Medium'
+          }));
       }
       
       // 2. Notes / CRM Entries
       if (result.note || result.action === 'create_note') {
            const noteContent = result.note?.text || text;
            const channel = result.note?.channel || 'note';
-           
-           // Resolve Client
            let clientId = context.clientId;
            if (!clientId && result.client?.name) {
                const c = clients.find(cl => cl.name.toLowerCase() === result.client?.name?.toLowerCase());
                clientId = c?.id;
            }
-           
            if (clientId) {
                addCRMEntry({
                    clientId,
@@ -391,14 +374,12 @@ export const useKanban = () => {
 
       // 4. Client
       if (result.action === 'create_client' && result.client) {
-           // Resolve BL
            let blId = context.businessLineId;
            if (result.client.businessLineName) {
                const bl = businessLines.find(b => b.name.toLowerCase() === result.client!.businessLineName!.toLowerCase());
                if (bl) blId = bl.id;
            }
-           if (!blId && businessLines.length > 0) blId = businessLines[0].id; // Fallback
-           
+           if (!blId && businessLines.length > 0) blId = businessLines[0].id;
            if (blId) {
                addClient({
                    name: result.client.name,
@@ -426,7 +407,21 @@ export const useKanban = () => {
           addProject(result.project);
       }
 
-  }, [clients, deals, businessLines, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject]);
+      // 7. Event (NEW)
+      if (result.action === 'create_event' && result.event) {
+          addEvent(result.event);
+      }
+
+      // 8. Candidate (NEW)
+      if (result.action === 'create_candidate' && result.candidate) {
+          addCandidate({
+              name: result.candidate.name,
+              roleApplied: result.candidate.roleApplied,
+              email: result.candidate.email || 'pending@email.com'
+          });
+      }
+
+  }, [clients, deals, businessLines, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate]);
 
   const findProspectsByName = useCallback(async ({ businessLineName }: { businessLineName: string }) => {
       return "Feature placeholder: Found prospects logic would run here.";
@@ -446,14 +441,12 @@ export const useKanban = () => {
       processTextAndExecute,
       findProspectsByName,
       
-      // Exposed Functions (Now Real)
       addBusinessLine,
       addDeal,
       addProject,
       addCRMEntry,
       addCRMEntryFromVoice: (data: any) => { addCRMEntry(data); return "Entry added."; },
       
-      // Remaining Stubs or UI Helpers
       updateBusinessLine: async (id: string, d: Partial<BusinessLine>) => { 
           await supabase.from('business_lines').update(d).eq('id', id);
           setBusinessLines(prev => prev.map(b => b.id === id ? {...b, ...d} : b));
@@ -482,7 +475,6 @@ export const useKanban = () => {
           setProjects(prev => prev.filter(p => p.id !== id));
       },
       addDocument: async (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => {
-          // Mock upload logic for demo, replacing stub
           const newDoc = {
               organization_id: orgId,
               name: file.name,

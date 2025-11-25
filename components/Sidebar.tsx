@@ -48,6 +48,8 @@ const HRIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg
 const TeamIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.512 2.72a3 3 0 01-4.682-2.72 9.094 9.094 0 013.741-.479m7.512 2.72a8.97 8.97 0 01-3.741-.479m3.741.479a8.97 8.97 0 00-3.741-.479m-7.512 2.72a9.094 9.094 0 01-3.741-.479m5.408 1.903a9.094 9.094 0 01-3.741-.479M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>;
 const DataIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" /></svg>;
 const SettingsIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-1.007 1.11-1.226.55-.22 1.156-.22 1.706 0 .55.219 1.02.684 1.11 1.226l.043.25a1.58 1.58 0 001.086 1.086l.25.043c.542.09 1.007.56 1.226 1.11.22.55.22 1.156 0 1.706-.219.55-.684 1.02-1.226 1.11l-.25.043a1.58 1.58 0 00-1.086 1.086l-.043.25c-.09.542-.56 1.007-1.11 1.226-.55.22-1.156.22-1.706 0-.55-.219-1.02-.684-1.11-1.226l-.043-.25a1.58 1.58 0 00-1.086-1.086l.25-.043c-.542-.09-1.007-.56-1.226-1.11-.22-.55-.22-1.156 0-1.706.219-.55.684-1.02 1.226-1.11l.25-.043a1.58 1.58 0 001.086-1.086l.043-.25z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.875a5.125 5.125 0 100 10.25 5.125 5.125 0 000-10.25z" /></svg>;
+const SocialIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" /></svg>;
+const AccessIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>;
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, setIsOpen, isSuperAdmin, permissions }) => {
   
@@ -64,40 +66,48 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             onClick={() => setIsOpen(false)}
         ></div>
 
-        <nav className={`fixed top-0 left-0 h-full w-64 bg-white p-4 border-r border-brevo-border flex flex-col z-40 transform transition-transform lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="mb-8">
-            <h2 className="text-2xl font-bold text-brevo-cta cursor-pointer" onClick={() => setActiveView('homepage')}>olooAI</h2>
+        <nav className={`fixed top-0 left-0 h-full w-64 bg-white p-4 border-r border-brevo-border flex flex-col z-40 transform transition-transform lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} overflow-y-auto`}>
+        <div className="mb-8 flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-brevo-cta cursor-pointer" onClick={() => { setActiveView('homepage'); setIsOpen(false); }}>olooAI</h2>
+            <button onClick={() => setIsOpen(false)} className="lg:hidden text-brevo-text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
         </div>
-        <ul className="space-y-1 overflow-y-auto flex-1">
-            <NavItem label="Homepage" view="homepage" activeView={activeView} onClick={setActiveView} icon={<HomeIcon />} />
+        <ul className="space-y-1 flex-1">
+            <NavItem label="Homepage" view="homepage" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<HomeIcon />} />
             
             <div className="pt-4 pb-2">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Core Workspace</p>
             </div>
-            {hasAccess('businessLines') && <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={setActiveView} icon={<BusinessIcon />} />}
-            {hasAccess('clients') && <NavItem label="Clients" view="clients" activeView={activeView} onClick={setActiveView} icon={<ClientsIcon />} />}
-            {hasAccess('deals') && <NavItem label="Deals" view="deals" activeView={activeView} onClick={setActiveView} icon={<DealsIcon />} />}
-            {hasAccess('projects') && <NavItem label="Projects" view="projects" activeView={activeView} onClick={setActiveView} icon={<ProjectsIcon />} />}
-            {hasAccess('crm') && <NavItem label="CRM" view="crm" activeView={activeView} onClick={setActiveView} icon={<CrmIcon />} />}
+            {hasAccess('businessLines') && <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<BusinessIcon />} />}
+            {hasAccess('clients') && <NavItem label="Clients" view="clients" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<ClientsIcon />} />}
+            {hasAccess('deals') && <NavItem label="Deals" view="deals" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<DealsIcon />} />}
+            {hasAccess('projects') && <NavItem label="Projects" view="projects" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<ProjectsIcon />} />}
+            {hasAccess('crm') && <NavItem label="CRM" view="crm" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<CrmIcon />} />}
+            
+            {/* Restored Social Media to Menu */}
+            <NavItem label="Social Media" view="homepage" activeView={activeView} onClick={() => { setActiveView('homepage'); /* Pass tab logic via props in real app, simplified here to go to homepage where social tab exists */ setIsOpen(false); }} icon={<SocialIcon />} />
 
             <div className="pt-4 pb-2">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Advanced Modules</p>
             </div>
-            {hasAccess('sales') && <NavItem label="Sales Pipeline" view="sales" activeView={activeView} onClick={setActiveView} icon={<SalesIcon />} />}
-            {hasAccess('events') && <NavItem label="Event Management" view="events" activeView={activeView} onClick={setActiveView} icon={<EventsIcon />} />}
-            {hasAccess('hr') && <NavItem label="HR & People" view="hr" activeView={activeView} onClick={setActiveView} icon={<HRIcon />} />}
+            {hasAccess('sales') && <NavItem label="Sales Pipeline" view="sales" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SalesIcon />} />}
+            {hasAccess('events') && <NavItem label="Event Management" view="events" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<EventsIcon />} />}
+            {hasAccess('hr') && <NavItem label="HR & People" view="hr" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<HRIcon />} />}
             
             <div className="pt-4 pb-2">
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Insights</p>
+                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Management</p>
             </div>
-            {hasAccess('data') && <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={setActiveView} icon={<DataIcon />} />}
+            {hasAccess('data') && <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<DataIcon />} />}
+            {/* Added User Access Management */}
+            {hasAccess('settings') && <NavItem label="User & Access" view="team" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<AccessIcon />} />}
+            {hasAccess('settings') && <NavItem label="Settings" view="settings" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />}
         </ul>
         <div className="mt-auto">
             <ul className="space-y-1 pt-4 border-t border-brevo-border">
                 {isSuperAdmin && (
-                    <NavItem label="Super Admin" view="admin" activeView={activeView} onClick={setActiveView} icon={<SettingsIcon />} className="text-red-700 hover:bg-red-50" />
+                    <NavItem label="Super Admin" view="admin" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} className="text-red-700 hover:bg-red-50" />
                 )}
-                {hasAccess('settings') && <NavItem label="Workspace Settings" view="team" activeView={activeView} onClick={setActiveView} icon={<TeamIcon />} />}
             </ul>
         </div>
         </nav>

@@ -322,6 +322,7 @@ export interface RouterTask {
   client_name: string | null;
   deal_name: string | null;
   update_hint: string | null;
+  priority?: 'Low' | 'Medium' | 'High';
 }
 
 export interface RouterNote {
@@ -330,7 +331,7 @@ export interface RouterNote {
 }
 
 export interface RouterBrainResult {
-  action: 'create_task' | 'create_note' | 'both' | 'update_task' | 'ignore' | 'create_business_line' | 'create_client' | 'create_deal' | 'create_project';
+  action: 'create_task' | 'create_note' | 'both' | 'update_task' | 'ignore' | 'create_business_line' | 'create_client' | 'create_deal' | 'create_project' | 'create_event' | 'create_candidate';
   tasks: RouterTask[];
   note: RouterNote | null;
   summary: string | null;
@@ -345,6 +346,16 @@ export interface RouterBrainResult {
       expectedRevenue: number;
       impactMetric: string;
       stage: ProjectStage;
+  };
+  event?: {
+      name: string;
+      location?: string;
+      date?: string;
+  };
+  candidate?: {
+      name: string;
+      roleApplied: string;
+      email: string;
   };
 }
 

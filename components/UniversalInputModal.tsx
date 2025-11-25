@@ -94,8 +94,8 @@ const UniversalInputModal: React.FC<UniversalInputModalProps> = ({ isOpen, onClo
       <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl border border-[#E5E7EB]" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col items-center text-center mb-6">
             <MagicIcon />
-            <h2 className="text-xl font-semibold text-[#111827]">Tell Walter what to do</h2>
-            <p className="text-sm text-brevo-text-secondary mt-1">Describe your task, deal, or client update in plain English. Walter will enhance, structure, and build it out for you.</p>
+            <h2 className="text-xl font-semibold text-[#111827]">Delegate to Walter</h2>
+            <p className="text-sm text-brevo-text-secondary mt-1">Just say the goal (e.g., "Plan the Q4 event"). Walter will build the entire plan, tasks, and schedule automatically.</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -148,7 +148,7 @@ const UniversalInputModal: React.FC<UniversalInputModalProps> = ({ isOpen, onClo
              <div className="flex justify-end space-x-3 pt-2">
                 <button type="button" onClick={onClose} className="py-2 px-5 rounded-lg text-[#111827] hover:bg-gray-100 font-medium">Cancel</button>
                 <button type="submit" className="py-2 px-6 rounded-lg bg-[#15803D] hover:bg-[#166534] text-white font-bold shadow-md transform active:scale-95 transition-all" disabled={!text.trim()}>
-                    Process with AI ✨
+                    DTW (Delegate to Walter) ⚡
                 </button>
             </div>
         </form>
