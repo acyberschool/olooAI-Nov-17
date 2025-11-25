@@ -33,13 +33,20 @@ interface TasksViewProps {
   onSelectTask: (task: Task) => void;
   onOpenUniversalInput: (context: UniversalInputContext) => void;
   kanbanApi: ReturnType<typeof useKanban>;
+  initialTab?: string;
 }
 
 type HomepageTab = 'Today' | 'All tasks' | 'Deals' | 'Clients' | 'Projects' | 'Social Media' | 'Sales' | 'Events' | 'HR' | 'Access' | 'Settings';
 
 const TasksView: React.FC<TasksViewProps> = (props) => {
-  const [activeTab, setActiveTab] = useState<HomepageTab>('Today');
+  const [activeTab, setActiveTab] = useState<HomepageTab>((props.initialTab as HomepageTab) || 'Today');
   const [overdueReminders, setOverdueReminders] = useState<Task[]>([]);
+
+  useEffect(() => {
+    if (props.initialTab) {
+        setActiveTab(props.initialTab as HomepageTab);
+    }
+  }, [props.initialTab]);
 
   const defaultBusinessLine = props.businessLines[0];
 

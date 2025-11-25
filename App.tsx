@@ -50,7 +50,8 @@ export const trackEvent = (action: string, category: string, label: string, valu
     }
 }
 
-export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'sales' | 'events' | 'hr' | 'projects' | 'crm' | 'team' | 'data' | 'settings' | 'admin' | 'social';
+// Flat View Structure as requested
+export type View = 'today' | 'allTasks' | 'crm' | 'businessLines' | 'deals' | 'clients' | 'projects' | 'social' | 'sales' | 'events' | 'hr' | 'access' | 'settings' | 'admin';
 
 const MenuIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -93,8 +94,11 @@ export default function App() {
     return <ApiKeyMissingError />;
   }
 
-  const [activeView, setActiveView] = useState<View>('homepage');
+  // Default view is 'today'
+  const [activeView, setActiveView] = useState<View>('today');
+  // Sidebar hidden by default on all screens
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
   const [selectedBusinessLineId, setSelectedBusinessLineId] = useState<string | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
@@ -300,36 +304,39 @@ export default function App() {
     
     const defaultBusinessLine = kanban.businessLines[0];
 
-    // Main Views
+    // Flat View Switcher
     switch (activeView) {
-      case 'settings': return <SettingsView kanbanApi={kanban} />;
-      case 'data': return <DataInsightsView kanbanApi={kanban} />;
-      case 'team': return <TeamView />;
+      case 'today':
+        return <TasksView initialTab="Today" tasks={kanban.tasks} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} projects={kanban.projects} updateTaskStatus={kanban.updateTaskStatusById} onSelectBusinessLine={handleSelectBusinessLine} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onOpenUniversalInput={handleOpenUniversalInput} kanbanApi={kanban} />;
+      case 'allTasks':
+        return <TasksView initialTab="All tasks" tasks={kanban.tasks} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} projects={kanban.projects} updateTaskStatus={kanban.updateTaskStatusById} onSelectBusinessLine={handleSelectBusinessLine} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onOpenUniversalInput={handleOpenUniversalInput} kanbanApi={kanban} />;
       case 'crm': return <CRMView clients={kanban.clients} crmEntries={kanban.crmEntries} tasks={kanban.tasks} businessLines={kanban.businessLines} onSelectClient={handleSelectClient} />;
       case 'businessLines': return <BusinessLinesView businessLines={kanban.businessLines} onSelectBusinessLine={handleSelectBusinessLine} onOpenUniversalInput={handleOpenUniversalInput} onUpdateBusinessLine={kanban.updateBusinessLine} />;
-      case 'clients': return <ClientsView clients={kanban.clients} businessLines={kanban.businessLines} onSelectClient={handleSelectClient} onOpenUniversalInput={handleOpenUniversalInput} onUpdateClient={kanban.updateClient} />;
+      case 'clients': return <ClientsView clients={kanban.clients} businessLines={kanban.businessLines} onSelectClient={handleSelectClient} onOpenUniversalInput={handleOpenUniversalInput} onUpdateClient={kanban.updateClient} kanbanApi={kanban} />;
       case 'deals': return <DealsView deals={kanban.deals} clients={kanban.clients} businessLines={kanban.businessLines} onSelectDeal={handleSelectDeal} onOpenUniversalInput={handleOpenUniversalInput} onUpdateDeal={kanban.updateDeal} />;
+      case 'projects': return <ProjectsView projects={kanban.projects} clients={kanban.clients} onSelectProject={handleSelectProject} onOpenUniversalInput={handleOpenUniversalInput} />;
+      case 'social': return defaultBusinessLine ? <SocialMediaTab businessLine={defaultBusinessLine} kanbanApi={kanban} /> : <div className="p-8 text-center text-gray-500">Create a Business Line to manage Social Media.</div>;
       case 'sales': return <SalesView deals={kanban.deals} clients={kanban.clients} onSelectDeal={handleSelectDeal} onOpenUniversalInput={handleOpenUniversalInput} />;
       case 'events': return <EventsView events={kanban.events} kanbanApi={kanban} />;
       case 'hr': return <HRView candidates={kanban.candidates} employees={kanban.employees} kanbanApi={kanban} />;
-      case 'projects': return <ProjectsView projects={kanban.projects} clients={kanban.clients} onSelectProject={handleSelectProject} onOpenUniversalInput={handleOpenUniversalInput} />;
-      case 'social': return defaultBusinessLine ? <SocialMediaTab businessLine={defaultBusinessLine} kanbanApi={kanban} /> : <div className="p-8 text-center text-gray-500">Create a Business Line to manage Social Media.</div>;
+      case 'access': return <TeamView />;
+      case 'settings': return <SettingsView kanbanApi={kanban} />;
       case 'admin': return isSuperAdmin ? <AdminDashboard /> : <div className="p-8 text-center text-gray-500">Access Denied. Admin only.</div>;
-      case 'homepage':
       default:
-        return <TasksView tasks={kanban.tasks} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} projects={kanban.projects} updateTaskStatus={kanban.updateTaskStatusById} onSelectBusinessLine={handleSelectBusinessLine} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onOpenUniversalInput={handleOpenUniversalInput} kanbanApi={kanban} />;
+        return <TasksView initialTab="Today" tasks={kanban.tasks} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} projects={kanban.projects} updateTaskStatus={kanban.updateTaskStatusById} onSelectBusinessLine={handleSelectBusinessLine} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onOpenUniversalInput={handleOpenUniversalInput} kanbanApi={kanban} />;
     }
   };
 
   return (
     <div className="min-h-screen font-sans flex flex-col lg:flex-row bg-brevo-light-gray">
       {showWalkthrough && <Walkthrough onComplete={handleWalkthroughComplete} />}
+      
       <Sidebar activeView={activeView} setActiveView={handleSetView} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} isSuperAdmin={isSuperAdmin} permissions={kanban.currentUserMember?.permissions} />
       
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col lg:ml-0 transition-all duration-300">
         <header className="p-4 border-b border-brevo-border flex items-center justify-between z-10 bg-white/80 backdrop-blur-sm sticky top-0">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="lg:hidden text-brevo-text-secondary hover:text-brevo-text-primary">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-brevo-text-secondary hover:text-brevo-text-primary">
               <MenuIcon />
             </button>
             <h1 className="text-xl font-bold text-brevo-cta">

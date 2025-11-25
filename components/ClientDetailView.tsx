@@ -206,6 +206,8 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
 };
 
 const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBack }) => {
+    const isSuperAdmin = kanbanApi.currentUserMember?.role === 'Admin' || kanbanApi.currentUserMember?.role === 'Owner';
+
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
@@ -235,6 +237,7 @@ const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBac
                 </div>
             </div>
             
+            {isSuperAdmin && (
             <div className="mt-8 pt-6 border-t border-red-200 bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
                 <h3 className="text-lg font-semibold text-red-700 mb-2">Danger Zone</h3>
                 <p className="text-sm text-brevo-text-secondary mb-3">Deleting this client will also delete all their associated deals, tasks, and documents. This action cannot be undone.</p>
@@ -250,10 +253,12 @@ const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBac
                     Delete this Client
                 </button>
             </div>
+            )}
         </div>
     )
 };
 
+// ... (Remaining components kept as is for brevity, they are imported and used)
 const ContactsTab: React.FC<{ client: Client, kanbanApi: ReturnType<typeof useKanban> }> = ({ client, kanbanApi }) => {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const clientContacts = kanbanApi.contacts.filter(c => c.clientId === client.id);
@@ -292,7 +297,6 @@ const ContactsTab: React.FC<{ client: Client, kanbanApi: ReturnType<typeof useKa
     )
 }
 
-// ... (Keep WorkTab, ConversationsTab, DocumentsTab, AiIdeasTab as they were)
 const WorkTab: React.FC<ClientDetailViewProps> = ({ client, tasks, deals, projects, businessLines, onSelectBusinessLine, onSelectDeal, onSelectProject, onSelectTask, kanbanApi, onOpenUniversalInput }) => {
     const handleAddDeal = () => {
         onOpenUniversalInput({
