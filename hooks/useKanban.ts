@@ -183,7 +183,22 @@ export const useKanban = () => {
       
       // If strict enforcement fails, we proceed with the first BL found (V1.2 Logic: Keep Walter working)
       if (!businessLineId && businessLines.length > 0) businessLineId = businessLines[0].id; 
-      if (!businessLineId) return null;
+      // If ABSOLUTELY no business lines exist, maybe create a default one? For now, return null.
+      if (!businessLineId) {
+          const { data: defaultBL } = await supabase.from('business_lines').insert({
+              organization_id: orgId,
+              name: 'General',
+              description: 'Default business line',
+              customers: 'General',
+              ai_focus: 'General'
+          }).select().single();
+          if (defaultBL) {
+              setBusinessLines(prev => [defaultBL as BusinessLine, ...prev]);
+              businessLineId = defaultBL.id;
+          } else {
+              return null;
+          }
+      }
 
       const payload = { ...data, businessLineId, organization_id: orgId };
       const { data: inserted, error } = await supabase.from('clients').insert(payload).select().single();
@@ -331,6 +346,7 @@ export const useKanban = () => {
 
   const addEvent = useCallback(async (data: Partial<Event>) => {
       if (!orgId) return;
+      // Inference logic for events: Default to first BL if not provided
       const businessLineId = businessLines.length > 0 ? businessLines[0].id : null;
       const payload = { ...data, organization_id: orgId, status: 'Planning', checklist: [] };
       const { data: inserted, error } = await supabase.from('events').insert(payload).select().single();
@@ -430,13 +446,16 @@ export const useKanban = () => {
 
   const addSocialPost = useCallback(async (data: any) => {
       if (!orgId) return "Error";
-      const { data: inserted } = await supabase.from('social_posts').insert({...data, organization_id: orgId}).select().single();
+      // Inference: Default to first Business Line if missing
+      const blId = data.business_line_id || (businessLines.length > 0 ? businessLines[0].id : null);
+      
+      const { data: inserted } = await supabase.from('social_posts').insert({...data, organization_id: orgId, business_line_id: blId}).select().single();
       if (inserted) {
           setSocialPosts(prev => [inserted as SocialPost, ...prev]);
           return "Post created";
       }
       return "Failed";
-  }, [orgId]);
+  }, [orgId, businessLines]);
 
   // --- AI DISPATCHER ---
   
@@ -463,6 +482,7 @@ export const useKanban = () => {
                const bl = businessLines.find(b => b.name.toLowerCase() === result.client!.businessLineName!.toLowerCase());
                if (bl) blId = bl.id;
            }
+           // Inference
            if (!blId && businessLines.length > 0) blId = businessLines[0].id;
            if (blId) {
                const newClient = await addClient({

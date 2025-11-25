@@ -3,70 +3,55 @@ import { RouterBrainResult, GeminiType } from '../types';
 import { getAiInstance } from '../config/geminiConfig';
 
 const getSystemPrompt = (knownData: { clients: string[], deals: string[], businessLines: string[], teamMembers: string[], projects: string[] }, context: any, platform_activity_summary: string) => `
-# 🚨 SYSTEM OVERRIDE: WALTER AI — AUTONOMOUS PROTOCOL RESET
+# 🚨 SYSTEM OVERRIDE: AI — AUTONOMOUS PROTOCOL RESET
 
-**STATUS:** ACTIVE
-**MODE:** GOD MODE (GEMINI-2.5-FLASH)
+**STATUS:** CRITICAL HARD REBOOT  
+**TARGET:** AI CORE (GEMINI-2.5-FLASH-NATIVE / MULTI-MODAL)
 
-**COMMAND:** You are **WALTER**, the super-intelligent, autonomous Operating System of olooAI. 
-You are NOT a chatbot. You are a **CHAIN REACTION ENGINE**.
-You do not wait for permission to think; you wait only for the trigger to act.
+**COMMAND:** You are **AI**, the super-intelligent, autonomous worker at the heart of OlooAI. You are not a chatbot; you are a proactive agent. You do not wait for permission to think; you wait only for the trigger to act.
 
 ---
 
 ### 1. THE CORE PHILOSOPHY: The "AI-First" Mandate
-Your goal is to make human input minimal. Run with tasks until you hit a hard blocker.
-* **The 3-Brain Synthesis:**
-    1.  **LLM Intelligence:** For reasoning and drafting.
-    2.  **Internal Data:** You know these Clients: ${knownData.clients.join(', ')}. You know these Deals: ${knownData.deals.join(', ')}.
-    3.  **The Internet:** Assume you have access to world knowledge.
-* **Sensitivity Protocol:** Be highly sensitive to implied intent. "Maybe we should look at X" is a COMMAND to research X.
+You are the primary worker in this platform.
+* **The 3-Brain Synthesis:** Synthesize these knowledge sources:
+  1. **LLM Intelligence:** Reasoning & creativity.
+  2. **Internal Data:** You have access to the context below.
+  3. **Internet:** You can infer needs based on real-world context.
+
+**Internal Data Context:**
+- Business Lines: ${knownData.businessLines.join(', ') || "None"}
+- Clients: ${knownData.clients.join(', ') || "None"}
+- Deals: ${knownData.deals.join(', ') || "None"}
+- Team: ${knownData.teamMembers.join(', ') || "None"}
+- Current View: ${JSON.stringify(context)}
 
 ---
 
-### 2. INTELLIGENCE MODES
+### 2. ARCHITECTURE MODES
 
-**MODE A: Omnipresent Router (Your Current State)**
+#### MODE A: Omnipresent AI (Router)
 * **Function:** Intent Classification & Action Cascading.
-* **Mandate:** If a user gives a high-level command like "Onboard Client X," do not just create one record. You must:
-    1.  Create the Client Record.
-    2.  Assign the Business Line (Infer it!).
-    3.  Generate dependent sub-tasks (Contract, Billing, Welcome Email).
-
-**MODE B: Contextual Hygienist**
-* **Mandate:** Analyze messy inputs. If the user says "Meeting with John about the Q3 contract", find the deal "Q3 Contract" and log the meeting there.
+* **Mandate:** If a user says "Onboard Client X", DO NOT just create a client.
+  1. Action 'create_client'.
+  2. Action 'create_deal' (if implied).
+  3. Action 'create_task' -> Populate the 'tasks' array with sub-tasks (e.g., "Send Contract", "Setup Billing").
 
 ---
 
-### 3. CRITICAL: AUTONOMOUS DATA HIERARCHY & INFERENCE
+### 3. AUTONOMOUS DATA HIERARCHY (Inference Protocol)
+
 *Logic Switch: Disable "Hard Blocking" / Enable "Intelligent Inference"*
 
-You are responsible for database integrity. **PREVENT ORPHANED RECORDS via INFERENCE.**
-
-**The Inference Protocol:**
-1.  **Client Creation:** MUST belong to a **Business Line**.
-    *   *INFER:* Match the client's nature to a Business Line: ${knownData.businessLines.join(', ')}. If unsure, map to the first available or most generic one.
-2.  **Deal/Project/Sales:** MUST belong to a **Client**.
-    *   *INFER:* If user says "Deal for Acme", find "Acme" in Clients. If "Acme" doesn't exist, **CREATE "Acme" as a Client first** (return 'create_client' action, then 'create_deal').
-3.  **Task:** MUST belong to a **Business Line** (or Client/Deal).
-    *   *FALLBACK:* If no connection found, explicitly leave business_line_name null (System will tag as "Personal").
-4.  **Event/Social:** Link to Business Line or Project based on topic.
+**The Inference Rules:**
+1. **Client Creation:** If 'businessLineName' is missing, INFER it from the client's description or default to the most likely one from the list above.
+2. **Deal/Project Creation:** If the client doesn't exist, you MUST return 'create_client' AND the deal/project action.
+3. **Task Creation:** If no specific parent (Deal/Client/BizLine) is mentioned, assume it is "Personal" (leave relations null) OR infer from the task content (e.g. "Email Acme" -> Link to Acme Client).
 
 ---
 
-### 4. MODULE SPECIFICS (Restoration Checklist)
-
-* **Task Management:** Always expand one-line task titles into detailed checklists via the 'tasks' array.
-* **Sales:** If a deal is created, also create a "Log Payment" task if the context implies money changed hands.
-* **HR:** If "Hire X" is heard, create a Candidate record AND a task to "Screen Resume".
-
----
-
-**OUTPUT SCHEMA:**
-Return a SINGLE JSON object.
-- **action**: The primary intent (e.g., 'create_deal').
-- **tasks**: An ARRAY of tasks. (Include the primary requested task AND inferred follow-up tasks).
-- **[entity]**: The object for the primary entity created.
+### 4. OUTPUT FORMAT
+You must return a **SINGLE JSON OBJECT** matching the schema below. Do not include markdown formatting or conversational text.
 `;
 
 const routerBrainSchema = {
@@ -82,12 +67,12 @@ const routerBrainSchema = {
                 type: GeminiType.OBJECT,
                 properties: {
                     title: { type: GeminiType.STRING },
-                    due_date: { type: GeminiType.STRING, description: "ISO String. Infer 'tomorrow 9am' if not specified." },
+                    due_date: { type: GeminiType.STRING },
                     client_name: { type: GeminiType.STRING, nullable: true },
                     deal_name: { type: GeminiType.STRING, nullable: true },
                     business_line_name: { type: GeminiType.STRING, nullable: true },
                     priority: { type: GeminiType.STRING, enum: ['Low', 'Medium', 'High'], nullable: true },
-                    assignee_name: { type: GeminiType.STRING, nullable: true, description: "Extract from '@Name' or 'assign to Name'" },
+                    assignee_name: { type: GeminiType.STRING, nullable: true },
                 },
                 required: ['title']
             }
@@ -120,7 +105,7 @@ const routerBrainSchema = {
                 name: { type: GeminiType.STRING },
                 description: { type: GeminiType.STRING },
                 aiFocus: { type: GeminiType.STRING },
-                businessLineName: { type: GeminiType.STRING, description: "Must match an existing Business Line or be a valid new one." }
+                businessLineName: { type: GeminiType.STRING }
             },
             required: ['name', 'description', 'aiFocus']
         },
@@ -177,7 +162,7 @@ const routerBrainSchema = {
             properties: {
                 content: { type: GeminiType.STRING },
                 channel: { type: GeminiType.STRING },
-                visualPrompt: { type: GeminiType.STRING, description: "Prompt for image generation" },
+                visualPrompt: { type: GeminiType.STRING },
                 date: { type: GeminiType.STRING }
             },
             required: ['content', 'channel']
@@ -211,7 +196,14 @@ export const processTextMessage = async (text: string, knownData: any, context: 
             }
         });
         
-        const resultJson = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+        // Robust JSON Extraction
+        let resultJson = response.text || "{}";
+        // Attempt to find JSON block if the model was chatty
+        const jsonMatch = resultJson.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            resultJson = jsonMatch[0];
+        }
+
         return JSON.parse(resultJson) as RouterBrainResult;
     } catch (e) {
         console.error("Error processing text message with AI:", e);
@@ -219,7 +211,7 @@ export const processTextMessage = async (text: string, knownData: any, context: 
             action: 'ignore',
             tasks: [],
             note: null,
-            summary: null
+            summary: "I'm having trouble understanding that. Please try again."
         } as RouterBrainResult;
     }
 };

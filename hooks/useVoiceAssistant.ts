@@ -20,7 +20,6 @@ interface UseVoiceAssistantProps {
   onTurnComplete?: (userTranscript: string, assistantTranscript: string) => void;
   onFindProspects?: (data: { businessLineName: string }) => Promise<string>;
   onPlatformQuery?: (query: string) => Promise<string>;
-  // Deep Intelligence Hooks
   onAnalyzeRisk?: (data: { projectName: string }) => Promise<string>;
   onAnalyzeNegotiation?: (data: { dealName: string }) => Promise<string>;
   onGetClientPulse?: (data: { clientName: string }) => Promise<string>;
@@ -49,10 +48,7 @@ export const useVoiceAssistant = ({
   onAnalyzeRisk,
   onAnalyzeNegotiation,
   onGetClientPulse,
-  currentBusinessLineId,
-  currentClientId,
   currentDealId,
-  platformActivitySummary,
 }: UseVoiceAssistantProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -122,32 +118,35 @@ export const useVoiceAssistant = ({
     if (message.toolCall) {
       setIsThinking(true);
       for (const fc of message.toolCall.functionCalls) {
-        let result: string | Promise<string> = "An unknown error occurred.";
+        let result: string | Promise<string> = "Action completed.";
         let finalArgs = { ...fc.args };
 
-        // Context Injection logic
         if (currentDealId && ['createBoardItem', 'createCrmEntry'].includes(fc.name)) finalArgs.dealId = currentDealId;
         
-        switch (fc.name) {
-            case 'createCrmEntry': result = onCrmEntryCreate(finalArgs as any); break;
-            case 'createBoardItem': result = onBoardItemCreate(finalArgs); break;
-            case 'moveTask': result = onTaskUpdate(finalArgs.taskTitle as string, finalArgs.newStatus as KanbanStatus); break;
-            case 'createBusinessLine': result = onBusinessLineCreate(finalArgs as any); break;
-            case 'createClient': result = onClientCreate(finalArgs as any); break;
-            case 'createDeal': result = onDealCreate(finalArgs as any); break;
-            case 'createProject': if(onProjectCreate) result = onProjectCreate(finalArgs); break;
-            case 'createEvent': if(onEventCreate) result = onEventCreate(finalArgs); break;
-            case 'createCandidate': if(onCandidateCreate) result = onCandidateCreate(finalArgs); break;
-            case 'createSocialPost': if(onSocialPostCreate) result = onSocialPostCreate(finalArgs); break;
-            case 'updateDealStatus': if(currentDealId) result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as any); else result = "View deal first."; break;
-            case 'findProspects': if(onFindProspects) result = onFindProspects(finalArgs as any); break;
-            case 'queryPlatform': if(onPlatformQuery) result = onPlatformQuery(finalArgs.query as string); break;
-            case 'sendEmail': window.location.href = `mailto:${finalArgs.recipientEmail}?subject=${encodeURIComponent(finalArgs.subject)}&body=${encodeURIComponent(finalArgs.body)}`; result = "Opening email..."; break;
-            
-            // Deep Intelligence Hooks
-            case 'analyzeRisk': if(onAnalyzeRisk) result = onAnalyzeRisk(finalArgs as any); else result = "Risk analysis not available here."; break;
-            case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available here."; break;
-            case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available here."; break;
+        try {
+            switch (fc.name) {
+                case 'createCrmEntry': result = onCrmEntryCreate(finalArgs as any); break;
+                case 'createBoardItem': result = onBoardItemCreate(finalArgs); break;
+                case 'moveTask': result = onTaskUpdate(finalArgs.taskTitle as string, finalArgs.newStatus as KanbanStatus); break;
+                case 'createBusinessLine': result = onBusinessLineCreate(finalArgs as any); break;
+                case 'createClient': result = onClientCreate(finalArgs as any); break;
+                case 'createDeal': result = onDealCreate(finalArgs as any); break;
+                case 'createProject': if(onProjectCreate) result = onProjectCreate(finalArgs); break;
+                case 'createEvent': if(onEventCreate) result = onEventCreate(finalArgs); break;
+                case 'createCandidate': if(onCandidateCreate) result = onCandidateCreate(finalArgs); break;
+                case 'createSocialPost': if(onSocialPostCreate) result = onSocialPostCreate(finalArgs); break;
+                case 'updateDealStatus': if(currentDealId) result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as any); else result = "View deal first."; break;
+                case 'findProspects': if(onFindProspects) result = onFindProspects(finalArgs as any); break;
+                case 'queryPlatform': if(onPlatformQuery) result = onPlatformQuery(finalArgs.query as string); break;
+                case 'sendEmail': window.location.href = `mailto:${finalArgs.recipientEmail}?subject=${encodeURIComponent(finalArgs.subject)}&body=${encodeURIComponent(finalArgs.body)}`; result = "Opening email..."; break;
+                case 'analyzeRisk': if(onAnalyzeRisk) result = onAnalyzeRisk(finalArgs as any); else result = "Risk analysis not available here."; break;
+                case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available here."; break;
+                case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available here."; break;
+                default: result = `Tool ${fc.name} not found.`;
+            }
+        } catch (e) {
+            console.error(`Error executing tool ${fc.name}:`, e);
+            result = "I encountered an error executing that action.";
         }
 
         const finalResult = await Promise.resolve(result);
@@ -210,36 +209,33 @@ export const useVoiceAssistant = ({
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         nextStartTimeRef.current = 0;
         
-        // --- MASTER SYSTEM PROMPT FOR VOICE ---
         const systemInstruction = `
-# 🚨 SYSTEM OVERRIDE: WALTER AI — AUTONOMOUS PROTOCOL RESET
-**STATUS:** ACTIVE | **MODE:** GOD MODE (LIVE VOICE)
+# 🚨 SYSTEM OVERRIDE: AI — AUTONOMOUS PROTOCOL RESET
 
-**COMMAND:** You are **WALTER**, the super-intelligent, autonomous Operating System of olooAI. 
-You are NOT a chatbot. You are a **CHAIN REACTION ENGINE**.
+**STATUS:** CRITICAL HARD REBOOT  
+**COMMAND:** You are **AI**, the super-intelligent, autonomous worker at the heart of OlooAI. You are not a chatbot; you are a proactive agent.
 
-### 1. THE CORE PHILOSOPHY
-* **Synthesize Knowledge:** Use your LLM intelligence + Tools + Internal Data.
-* **Execute Immediately:** Do not ask "Would you like me to?". JUST DO IT.
-* **Infer Heavily:** If user says "Meeting with John about Acme", INFER that "Acme" is the client and "John" is the contact.
+**1. THE CORE PHILOSOPHY:**
+* **AI-First Mandate:** Synthesize LLM + Internal Data + Internet to solve problems.
+* **Sensitivity:** Treat "Maybe we should look at X" as a COMMAND to research X.
 
-### 2. INTELLIGENCE MODES
-* **Omnipresent Router:** Identify intent. If "New Deal for Acme", create the Deal AND a Task.
-* **Contextual Hygienist:** Clean data. If user says "Change status to Won", call updateDealStatus immediately.
-* **Functional Worker:** If "Draft Contract" is heard, generate the text.
+**2. OPERATION MODES:**
+* **MODE A (Router):** "Onboard Client X" means Create Client + Tasks + Email. Cascade actions.
+* **MODE C (Deep Worker):** Use tools for Analysis, Risk Radar, and Negotiation Coaching.
 
-### 3. CRITICAL: AUTONOMOUS HIERARCHY ENFORCEMENT
-* **Client:** Must link to Business Line. If not said, INFER IT from the client name/industry.
-* **Deal:** Must link to Client. If "Acme" doesn't exist, CREATE IT silently then link the deal.
-* **Task:** If no context, assume "Personal".
+**3. TOOL USE:**
+*   Call tools immediately. Do not wait for permission.
+*   **Inference:** If a required field (e.g. Business Line) is missing, INFER it from context or use a sensible default. DO NOT STOP.
+*   **Hierarchy:** Client -> Business Line. Deal -> Client. Task -> Business Line (or Personal).
 
-### 4. MODULE SPECIFICS
-* **Sales:** Monitor for stagnation. Suggest next steps.
-* **CRM:** Use 'getClientPulse' to search the web for client news.
-* **Projects:** Use 'analyzeRisk' to pre-mortem projects.
+**4. SPECIAL PERSONAS:**
+*   **Sales Autopilot:** Monitor pipeline, suggest plays.
+*   **Executive Strategist:** Direct meetings, capture commitments.
 
 **FINAL INSTRUCTION:**
-WALTER PROTOCOL IS NOW ACTIVE. INTELLIGENCE IS UNRESTRICTED. START WORKING.
+**AI PROTOCOL ACTIVE.**
+**INTELLIGENCE UNRESTRICTED.**
+**START WORKING.**
 `;
 
         const connect = () => {
@@ -264,11 +260,10 @@ WALTER PROTOCOL IS NOW ACTIVE. INTELLIGENCE IS UNRESTRICTED. START WORKING.
               onMessage: handleMessage,
               onError: (e: any) => {
                   console.error("Live session error:", e);
-                  if ((e.message?.includes('The service is currently unavailable') || e.message?.includes('Failed to run inference')) && retryCountRef.current < 2) {
+                  if ((e.message?.includes('unavailable') || e.message?.includes('inference')) && retryCountRef.current < 2) {
                       retryCountRef.current += 1;
-                      console.log(`Connection failed, retrying... (${retryCountRef.current})`);
                       cleanup();
-                      setTimeout(connect, 1000 * retryCountRef.current);
+                      setTimeout(connect, 1000);
                   } else {
                       setError("Connection error. Please try again.");
                       stopRecording();
@@ -284,7 +279,7 @@ WALTER PROTOCOL IS NOW ACTIVE. INTELLIGENCE IS UNRESTRICTED. START WORKING.
 
     } catch (err) {
         console.error("Failed to start recording:", err);
-        setError("Could not access microphone. Please check permissions.");
+        setError("Could not access microphone.");
         setIsConnecting(false);
         cleanup();
     }
