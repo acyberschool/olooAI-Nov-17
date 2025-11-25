@@ -51,6 +51,12 @@ const SettingsIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/20
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, setIsOpen, isSuperAdmin, permissions }) => {
   
+  const hasAccess = (module: string) => {
+      if (!permissions || !permissions.access) return false;
+      if (permissions.access.includes('all')) return true;
+      return permissions.access.includes(module);
+  };
+
   return (
     <>
         <div 
@@ -68,30 +74,30 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             <div className="pt-4 pb-2">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Core</p>
             </div>
-            <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={setActiveView} icon={<BusinessIcon />} />
-            <NavItem label="Clients" view="clients" activeView={activeView} onClick={setActiveView} icon={<ClientsIcon />} />
-            <NavItem label="Deals" view="deals" activeView={activeView} onClick={setActiveView} icon={<DealsIcon />} />
-            <NavItem label="Projects" view="projects" activeView={activeView} onClick={setActiveView} icon={<ProjectsIcon />} />
-            <NavItem label="CRM" view="crm" activeView={activeView} onClick={setActiveView} icon={<CrmIcon />} />
+            {hasAccess('businessLines') && <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={setActiveView} icon={<BusinessIcon />} />}
+            {hasAccess('clients') && <NavItem label="Clients" view="clients" activeView={activeView} onClick={setActiveView} icon={<ClientsIcon />} />}
+            {hasAccess('deals') && <NavItem label="Deals" view="deals" activeView={activeView} onClick={setActiveView} icon={<DealsIcon />} />}
+            {hasAccess('projects') && <NavItem label="Projects" view="projects" activeView={activeView} onClick={setActiveView} icon={<ProjectsIcon />} />}
+            {hasAccess('crm') && <NavItem label="CRM" view="crm" activeView={activeView} onClick={setActiveView} icon={<CrmIcon />} />}
 
             <div className="pt-4 pb-2">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Modules</p>
             </div>
-            <NavItem label="Sales Pipeline" view="sales" activeView={activeView} onClick={setActiveView} icon={<SalesIcon />} />
-            <NavItem label="Events" view="events" activeView={activeView} onClick={setActiveView} icon={<EventsIcon />} />
-            <NavItem label="HR & Team" view="hr" activeView={activeView} onClick={setActiveView} icon={<HRIcon />} />
+            {hasAccess('sales') && <NavItem label="Sales Pipeline" view="sales" activeView={activeView} onClick={setActiveView} icon={<SalesIcon />} />}
+            {hasAccess('events') && <NavItem label="Events" view="events" activeView={activeView} onClick={setActiveView} icon={<EventsIcon />} />}
+            {hasAccess('hr') && <NavItem label="HR & Team" view="hr" activeView={activeView} onClick={setActiveView} icon={<HRIcon />} />}
             
             <div className="pt-4 pb-2">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Insights</p>
             </div>
-            <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={setActiveView} icon={<DataIcon />} />
+            {hasAccess('data') && <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={setActiveView} icon={<DataIcon />} />}
         </ul>
         <div className="mt-auto">
             <ul className="space-y-1 pt-4 border-t border-brevo-border">
                 {isSuperAdmin && (
                     <NavItem label="Super Admin" view="admin" activeView={activeView} onClick={setActiveView} icon={<SettingsIcon />} className="text-red-700 hover:bg-red-50" />
                 )}
-                <NavItem label="Workspace Settings" view="team" activeView={activeView} onClick={setActiveView} icon={<TeamIcon />} />
+                {hasAccess('settings') && <NavItem label="Workspace Settings" view="team" activeView={activeView} onClick={setActiveView} icon={<TeamIcon />} />}
             </ul>
         </div>
         </nav>

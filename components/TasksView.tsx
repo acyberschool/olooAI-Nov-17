@@ -11,6 +11,10 @@ import AdminDashboard from './AdminDashboard';
 import SalesView from './SalesView';
 import EventsView from './EventsView';
 import HRView from './HRView';
+import DealsView from './DealsView';
+import ClientsView from './ClientsView';
+import ProjectsView from './ProjectsView';
+import SocialMediaTab from './SocialMediaTab';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -28,15 +32,27 @@ interface TasksViewProps {
   kanbanApi: ReturnType<typeof useKanban>;
 }
 
-type HomepageTab = 'Today' | 'All tasks' | 'Sales' | 'Events' | 'HR' | 'Access';
+type HomepageTab = 'Today' | 'All tasks' | 'Deals' | 'Clients' | 'Projects' | 'Social Media' | 'Sales' | 'Events' | 'HR' | 'Access';
 
 const TasksView: React.FC<TasksViewProps> = (props) => {
   const [activeTab, setActiveTab] = useState<HomepageTab>('Today');
+
+  // Mock a business line for the general social media view if needed, or use the first available one
+  // Ideally, SocialMediaTab takes a businessLine. For the homepage, we might show an aggregate or select the primary one.
+  // For now, we'll default to the first business line to show functionality, or placeholder.
+  const defaultBusinessLine = props.businessLines[0];
 
   const tabContent = () => {
     switch (activeTab) {
         case 'Today': return <TodayTab {...props} />;
         case 'All tasks': return <AllTasksTab {...props} />;
+        case 'Deals': return <DealsView deals={props.deals} clients={props.clients} businessLines={props.businessLines} onSelectDeal={props.onSelectDeal} onOpenUniversalInput={props.onOpenUniversalInput} onUpdateDeal={props.kanbanApi.updateDeal} />;
+        case 'Clients': return <ClientsView clients={props.clients} businessLines={props.businessLines} onSelectClient={props.onSelectClient} onOpenUniversalInput={props.onOpenUniversalInput} onUpdateClient={props.kanbanApi.updateClient} kanbanApi={props.kanbanApi} />;
+        case 'Projects': return <ProjectsView projects={props.projects} clients={props.clients} onSelectProject={props.onSelectProject} onOpenUniversalInput={props.onOpenUniversalInput} />;
+        case 'Social Media': 
+            return defaultBusinessLine ? 
+                <SocialMediaTab businessLine={defaultBusinessLine} kanbanApi={props.kanbanApi} /> : 
+                <div className="text-center py-10 text-gray-500">Create a Business Line to manage Social Media.</div>;
         case 'Sales': return <SalesView deals={props.deals} clients={props.clients} onSelectDeal={props.onSelectDeal} onOpenUniversalInput={props.onOpenUniversalInput} />;
         case 'Events': return <EventsView events={props.kanbanApi.events} kanbanApi={props.kanbanApi} />;
         case 'HR': return <HRView candidates={props.kanbanApi.candidates} employees={props.kanbanApi.employees} kanbanApi={props.kanbanApi} />;
@@ -49,7 +65,7 @@ const TasksView: React.FC<TasksViewProps> = (props) => {
     <div>
         <h2 className="text-2xl font-semibold text-brevo-text-primary mb-4">Homepage</h2>
         <Tabs
-            tabs={['Today', 'All tasks', 'Sales', 'Events', 'HR', 'Access']}
+            tabs={['Today', 'All tasks', 'Deals', 'Clients', 'Projects', 'Social Media', 'Sales', 'Events', 'HR', 'Access']}
             activeTab={activeTab}
             setActiveTab={setActiveTab as (tab: string) => void}
         />

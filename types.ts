@@ -28,8 +28,9 @@ export interface OrganizationMember {
     name: string;
     email: string;
     role: 'Owner' | 'Admin' | 'Member';
-    permissions: { access: string[] }; // e.g. ['clients', 'hr', 'sales']
+    permissions: { access: string[] }; // e.g. ['clients', 'hr', 'sales'] or ['all']
     status: 'Active' | 'Invited';
+    lastActive?: string; // ISO Date string
 }
 
 // --- NEW MODULE TYPES ---

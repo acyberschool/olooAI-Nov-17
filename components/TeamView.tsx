@@ -1,20 +1,40 @@
 
 import React, { useState } from 'react';
 import { useKanban } from '../hooks/useKanban';
-import { Role } from '../types';
 
 const PlusIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>);
 
 const TeamView: React.FC = () => {
     const { teamMembers, inviteMember } = useKanban();
     const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState('Member');
+    
+    // Permission States
+    const [permissions, setPermissions] = useState({
+        businessLines: true,
+        clients: true,
+        deals: true,
+        projects: true,
+        crm: true,
+        sales: false,
+        events: false,
+        hr: false,
+        data: false,
+        settings: false,
+    });
+
+    const handlePermissionChange = (module: keyof typeof permissions) => {
+        setPermissions(prev => ({ ...prev, [module]: !prev[module] }));
+    }
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
         if (inviteEmail) {
-            // Map legacy role selection to new structure
-            inviteMember(inviteEmail, { access: ['all'] });
+            // Construct access array
+            const accessList = Object.entries(permissions)
+                .filter(([_, enabled]) => enabled)
+                .map(([key]) => key);
+
+            inviteMember(inviteEmail, { access: accessList });
             
             const subject = encodeURIComponent("Invitation to join olooAI Workspace");
             const body = encodeURIComponent(`Hi,\n\nI'm inviting you to join our workspace on olooAI. We'll be using it to manage tasks, clients, and projects.\n\nPlease accept the invite to get started.\n\nBest,\nAdmin`);
@@ -22,6 +42,11 @@ const TeamView: React.FC = () => {
             window.location.href = `mailto:${inviteEmail}?subject=${subject}&body=${body}`;
             
             setInviteEmail('');
+            // Reset permissions to defaults
+            setPermissions({
+                businessLines: true, clients: true, deals: true, projects: true, crm: true,
+                sales: false, events: false, hr: false, data: false, settings: false
+            });
         }
     };
 
@@ -38,7 +63,8 @@ const TeamView: React.FC = () => {
                             <tr>
                                 <th className="p-4 text-sm font-medium text-[#6B7280]">Name</th>
                                 <th className="p-4 text-sm font-medium text-[#6B7280] hidden sm:table-cell">Role</th>
-                                <th className="p-4 text-sm font-medium text-[#6B7280] hidden md:table-cell">Permissions</th>
+                                <th className="p-4 text-sm font-medium text-[#6B7280] hidden md:table-cell">Access</th>
+                                <th className="p-4 text-sm font-medium text-[#6B7280]">Last Active</th>
                                 <th className="p-4 text-sm font-medium text-[#6B7280]">Status</th>
                             </tr>
                         </thead>
@@ -53,9 +79,18 @@ const TeamView: React.FC = () => {
                                         <span className="bg-gray-100 text-gray-700 rounded-full px-3 py-1 text-sm font-medium">{member.role}</span>
                                     </td>
                                     <td className="p-4 hidden md:table-cell">
-                                        <span className="rounded-full px-3 py-1 text-sm font-medium bg-purple-100 text-purple-800">
-                                            {member.permissions?.access?.join(', ') || 'Restricted'}
-                                        </span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {member.permissions?.access?.includes('all') ? (
+                                                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800">Full Admin</span>
+                                            ) : (
+                                                member.permissions?.access?.map(p => (
+                                                    <span key={p} className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 capitalize">{p}</span>
+                                                ))
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-sm text-gray-600">
+                                        {member.lastActive ? new Date(member.lastActive).toLocaleString() : 'Never'}
                                     </td>
                                     <td className="p-4">
                                         <span className={`text-sm font-bold ${member.status === 'Active' ? 'text-green-600' : 'text-yellow-600'}`}>{member.status}</span>
@@ -70,7 +105,7 @@ const TeamView: React.FC = () => {
             <div className="mt-8 bg-white p-6 rounded-xl shadow-lg border border-[#E5E7EB]">
                 <h3 className="text-lg font-semibold mb-4 text-[#111827]">Invite a new member</h3>
                 <form onSubmit={handleInvite}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium text-[#111827] mb-2">Email Address</label>
                         <input 
@@ -82,16 +117,22 @@ const TeamView: React.FC = () => {
                             required
                         />
                     </div>
+                    
                     <div>
-                        <label className="block text-sm font-medium text-[#111827] mb-2">What can this person do?</label>
-                        <select 
-                            value={inviteRole}
-                            onChange={(e) => setInviteRole(e.target.value)}
-                            className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
-                        >
-                            <option value="Member">Member</option>
-                            <option value="Admin">Admin</option>
-                        </select>
+                        <label className="block text-sm font-medium text-[#111827] mb-3">Access Permissions</label>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {Object.keys(permissions).map((module) => (
+                                <label key={module} className="flex items-center space-x-2 bg-gray-50 p-2 rounded border border-gray-200 cursor-pointer hover:bg-gray-100">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={permissions[module as keyof typeof permissions]} 
+                                        onChange={() => handlePermissionChange(module as keyof typeof permissions)}
+                                        className="rounded text-[#15803D] focus:ring-[#15803D]"
+                                    />
+                                    <span className="text-sm capitalize text-gray-700">{module.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                </label>
+                            ))}
+                        </div>
                     </div>
                 </div>
                 <div className="mt-6 flex justify-end items-center space-x-4">

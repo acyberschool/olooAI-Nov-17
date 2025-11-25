@@ -29,7 +29,7 @@ interface BusinessLineDetailViewProps {
   initialTab?: string;
 }
 
-type BusinessLineTab = 'Overview' | 'Work' | 'Clients' | 'Revenue' | 'Prospects' | 'Playbook' | 'Documents' | 'Social Media' | 'Competitors';
+type BusinessLineTab = 'Overview' | 'Work' | 'Clients' | 'Revenue' | 'Social Media' | 'Prospects' | 'Playbook' | 'Documents' | 'Competitors';
 
 const EditIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>);
 
@@ -133,10 +133,10 @@ const BusinessLineDetailView: React.FC<BusinessLineDetailViewProps> = (props) =>
       case 'Work': return <WorkTab {...props} />;
       case 'Clients': return <ClientsTab {...props} />;
       case 'Revenue': return <RevenueView deals={props.deals} />;
+      case 'Social Media': return <SocialMediaTab businessLine={businessLine} kanbanApi={props.kanbanApi} />;
       case 'Prospects': return <ProspectsView businessLine={businessLine} kanbanApi={props.kanbanApi} />;
       case 'Playbook': return <PlaybookTab {...props} />;
       case 'Documents': return <DocumentsTab {...props} />;
-      case 'Social Media': return <SocialMediaTab businessLine={businessLine} kanbanApi={props.kanbanApi} />;
       case 'Competitors': return <CompetitorsView businessLine={props.businessLine} kanbanApi={props.kanbanApi} />;
       default: return null;
     }
@@ -208,7 +208,6 @@ const OverviewTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, kanb
     </div>
 );
 
-// ... (keep WorkTab, ClientsTab, PlaybookTab, DocumentsTab, RevenueIdeasTab)
 const WorkTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, tasks, clients, deals, kanbanApi, onSelectClient, onSelectDeal, onSelectTask }) => (
     <div>
         <h3 className="text-xl font-semibold mb-4 text-brevo-text-primary">Tasks for {businessLine.name}</h3>
