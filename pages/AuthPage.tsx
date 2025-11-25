@@ -28,9 +28,7 @@ const AuthPage: React.FC = () => {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          // We are using email OTP – no redirects or magic links
           shouldCreateUser: true, // allow new users to sign up via OTP
-          // IMPORTANT: no emailRedirectTo needed for pure OTP code flow
         },
       });
 
@@ -73,9 +71,9 @@ const AuthPage: React.FC = () => {
       }
 
       if (data.session) {
-        setMessage("Logged in successfully. Redirecting…");
-        // Force a reload or redirect to clear auth state
-        window.location.href = "/"; 
+        setMessage("Logged in successfully. Loading your workspace...");
+        // The parent component (App.tsx) listens to auth state changes and will unmount this page
+        // once the session is detected. No explicit redirect needed.
       } else {
         setError("Login failed – no session returned.");
       }

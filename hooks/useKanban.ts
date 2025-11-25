@@ -37,15 +37,19 @@ export const useKanban = () => {
           if (!user || !user.email) return;
 
           // A. Check for Pending Invites (Link by Email)
-          // If I was invited by email but haven't logged in before, my row has email but no user_id.
-          // We fix that now.
-          const { error: updateError } = await supabase
-              .from('organization_members')
-              .update({ user_id: user.id, status: 'Active' })
-              .eq('email', user.email)
-              .is('user_id', null);
+          try {
+              const { error: updateError } = await supabase
+                  .from('organization_members')
+                  .update({ user_id: user.id, status: 'Active' })
+                  .eq('email', user.email)
+                  .is('user_id', null);
 
-          if (updateError) console.error("Error linking invites:", updateError);
+              if (updateError) {
+                  console.warn("Notice: Could not automatically link invites (RLS or no invites). Details:", JSON.stringify(updateError));
+              }
+          } catch (e) {
+              console.warn("Invite check skipped due to error:", e);
+          }
 
           // B. Fetch Memberships
           let { data: members } = await supabase
