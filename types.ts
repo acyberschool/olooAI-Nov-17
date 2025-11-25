@@ -323,6 +323,7 @@ export interface RouterTask {
   deal_name: string | null;
   update_hint: string | null;
   priority?: 'Low' | 'Medium' | 'High';
+  assignee_name?: string | null; // For ATC (Assign to Colleague)
 }
 
 export interface RouterNote {

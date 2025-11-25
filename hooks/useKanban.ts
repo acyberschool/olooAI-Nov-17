@@ -335,16 +335,27 @@ export const useKanban = () => {
       const result = await processTextMessage(text, { 
           clients: clients.map(c => c.name), 
           deals: deals.map(d => d.name), 
-          businessLines: businessLines.map(b => b.name) 
+          businessLines: businessLines.map(b => b.name),
+          teamMembers: teamMembers.map(m => m.name) // Pass members to AI for ATC
       }, context, "User is active", file);
 
       // 1. Tasks
       if (result.action === 'create_task' || result.action === 'both') {
-          result.tasks.forEach(t => addTask({ 
-              title: t.title, 
-              dueDate: t.due_date || undefined,
-              priority: t.priority || 'Medium'
-          }));
+          result.tasks.forEach(t => {
+              let assigneeId = undefined;
+              // ATC Logic: Resolve assignee name to ID
+              if (t.assignee_name) {
+                  const member = teamMembers.find(m => m.name.toLowerCase().includes(t.assignee_name!.toLowerCase()));
+                  if (member) assigneeId = member.id;
+              }
+
+              addTask({ 
+                  title: t.title, 
+                  dueDate: t.due_date || undefined,
+                  priority: t.priority || 'Medium',
+                  assigneeId: assigneeId
+              });
+          });
       }
       
       // 2. Notes / CRM Entries
@@ -421,7 +432,7 @@ export const useKanban = () => {
           });
       }
 
-  }, [clients, deals, businessLines, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate]);
+  }, [clients, deals, businessLines, teamMembers, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate]);
 
   const findProspectsByName = useCallback(async ({ businessLineName }: { businessLineName: string }) => {
       return "Feature placeholder: Found prospects logic would run here.";

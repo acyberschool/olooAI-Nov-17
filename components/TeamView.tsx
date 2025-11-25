@@ -36,8 +36,9 @@ const TeamView: React.FC = () => {
 
             inviteMember(inviteEmail, { access: accessList });
             
+            const appUrl = window.location.origin;
             const subject = encodeURIComponent("Invitation to join olooAI Workspace");
-            const body = encodeURIComponent(`Hi,\n\nI'm inviting you to join our workspace on olooAI. We'll be using it to manage tasks, clients, and projects.\n\nPlease accept the invite to get started.\n\nBest,\nAdmin`);
+            const body = encodeURIComponent(`Hi,\n\nI'm inviting you to join our workspace on olooAI. We'll be using it to manage tasks, clients, and projects.\n\nPlease sign in here to accept the invite:\n${appUrl}\n\nBest,\nAdmin`);
             
             window.location.href = `mailto:${inviteEmail}?subject=${subject}&body=${body}`;
             

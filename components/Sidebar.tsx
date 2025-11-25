@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             </div>
             {hasAccess('data') && <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<DataIcon />} />}
             {/* Added User Access Management */}
-            {hasAccess('settings') && <NavItem label="User & Access" view="team" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<AccessIcon />} />}
+            {hasAccess('settings') && <NavItem label="Members & Access" view="team" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<AccessIcon />} />}
             {hasAccess('settings') && <NavItem label="Settings" view="settings" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />}
         </ul>
         <div className="mt-auto">

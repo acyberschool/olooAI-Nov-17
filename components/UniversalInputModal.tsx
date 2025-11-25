@@ -111,6 +111,9 @@ const UniversalInputModal: React.FC<UniversalInputModalProps> = ({ isOpen, onClo
                 required
                 autoFocus
               />
+              <div className="absolute bottom-3 right-3 text-xs text-gray-400 font-medium pointer-events-none">
+                  Tip: Type <span className="bg-gray-200 rounded px-1 text-gray-600">@Name</span> to assign a task.
+              </div>
               <div className="absolute bottom-3 left-3 flex items-center gap-2">
                   <button 
                     type="button" 
