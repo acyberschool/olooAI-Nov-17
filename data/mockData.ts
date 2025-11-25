@@ -1,9 +1,12 @@
 
 import { Task, BusinessLine, Client, Deal, Document, Playbook, CRMEntry, Project, TeamMember, KanbanStatus, TaskType, Contact } from '../types';
 
+const ORG_ID = 'org-default';
+
 export const initialBusinessLines: BusinessLine[] = [
     {
         id: 'bl-1',
+        organizationId: ORG_ID,
         name: 'Fumigation',
         description: 'Residential and commercial pest control services.',
         customers: 'Apartments, offices, and homeowners.',
@@ -11,6 +14,7 @@ export const initialBusinessLines: BusinessLine[] = [
     },
     {
         id: 'bl-2',
+        organizationId: ORG_ID,
         name: 'Tech Consulting',
         description: 'Digital transformation and IT support.',
         customers: 'SMEs and Startups.',
@@ -21,6 +25,7 @@ export const initialBusinessLines: BusinessLine[] = [
 export const initialClients: Client[] = [
     {
         id: 'client-1',
+        organizationId: ORG_ID,
         name: 'ABC Apartments',
         description: 'A large residential complex in Westlands.',
         aiFocus: 'Interested in quarterly fumigation.',
@@ -30,6 +35,7 @@ export const initialClients: Client[] = [
     },
     {
         id: 'client-2',
+        organizationId: ORG_ID,
         name: 'XYZ Logistics',
         description: 'Regional logistics firm.',
         aiFocus: 'Needs fleet management software audit.',
@@ -42,6 +48,7 @@ export const initialClients: Client[] = [
 export const initialDeals: Deal[] = [
     {
         id: 'deal-1',
+        organizationId: ORG_ID,
         name: 'Q3 Fumigation Contract',
         description: 'Quarterly pest control for 3 blocks.',
         status: 'Open',
@@ -57,6 +64,7 @@ export const initialDeals: Deal[] = [
 export const initialProjects: Project[] = [
     {
         id: 'proj-1',
+        organizationId: ORG_ID,
         partnerName: 'Nation Media Group',
         projectName: 'AI Workshop Series',
         goal: 'Train 50 journalists on AI tools.',
@@ -78,6 +86,7 @@ export const initialProjects: Project[] = [
 export const initialTasks: Task[] = [
     {
         id: 'task-1',
+        organizationId: ORG_ID,
         title: 'Call ABC Apartments Manager',
         status: KanbanStatus.ToDo,
         type: TaskType.Task,
@@ -88,6 +97,7 @@ export const initialTasks: Task[] = [
     },
     {
         id: 'task-2',
+        organizationId: ORG_ID,
         title: 'Draft Workshop Agenda',
         status: KanbanStatus.Doing,
         type: TaskType.Task,
@@ -102,5 +112,13 @@ export const initialCRMEntries: CRMEntry[] = [];
 export const initialContacts: Contact[] = [];
 
 export const initialTeamMembers: TeamMember[] = [
-    { id: '1', name: 'You (Admin)', email: 'admin@oloo.ai', status: 'Active', role: { scope: 'All access', permission: 'Can edit' } }
+    { 
+        id: '1', 
+        organizationId: ORG_ID,
+        name: 'You (Admin)', 
+        email: 'admin@oloo.ai', 
+        status: 'Active', 
+        role: 'Admin',
+        permissions: { access: ['all'] }
+    }
 ];

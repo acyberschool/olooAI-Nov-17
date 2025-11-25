@@ -4,17 +4,17 @@ import { useKanban } from '../hooks/useKanban';
 import { Role } from '../types';
 
 const PlusIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>);
-const GoogleIcon = () => (<svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>);
 
 const TeamView: React.FC = () => {
     const { teamMembers, inviteMember } = useKanban();
     const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState('Handle everything (All access)');
+    const [inviteRole, setInviteRole] = useState('Member');
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
         if (inviteEmail) {
-            inviteMember(inviteEmail, { scope: 'All access', permission: 'Can edit' } as Role);
+            // Map legacy role selection to new structure
+            inviteMember(inviteEmail, { access: ['all'] });
             
             const subject = encodeURIComponent("Invitation to join olooAI Workspace");
             const body = encodeURIComponent(`Hi,\n\nI'm inviting you to join our workspace on olooAI. We'll be using it to manage tasks, clients, and projects.\n\nPlease accept the invite to get started.\n\nBest,\nAdmin`);
@@ -29,10 +29,6 @@ const TeamView: React.FC = () => {
         <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                 <h2 className="text-2xl font-semibold text-[#15803D] mb-2 sm:mb-0">Team & Access</h2>
-                 <button onClick={() => alert("Authentication is simulated for this demo.")} className="bg-white text-gray-700 font-medium py-2 px-4 rounded border border-gray-300 hover:bg-gray-50 flex items-center">
-                    <GoogleIcon />
-                    Sign in with Google
-                </button>
             </div>
 
             <div className="bg-white rounded-xl shadow-lg border border-[#E5E7EB] overflow-hidden">
@@ -41,7 +37,7 @@ const TeamView: React.FC = () => {
                         <thead className="border-b border-[#E5E7EB] bg-gray-50">
                             <tr>
                                 <th className="p-4 text-sm font-medium text-[#6B7280]">Name</th>
-                                <th className="p-4 text-sm font-medium text-[#6B7280] hidden sm:table-cell">Access Scope</th>
+                                <th className="p-4 text-sm font-medium text-[#6B7280] hidden sm:table-cell">Role</th>
                                 <th className="p-4 text-sm font-medium text-[#6B7280] hidden md:table-cell">Permissions</th>
                                 <th className="p-4 text-sm font-medium text-[#6B7280]">Status</th>
                             </tr>
@@ -54,11 +50,11 @@ const TeamView: React.FC = () => {
                                         <p className="text-xs text-[#6B7280]">{member.email}</p>
                                     </td>
                                     <td className="p-4 hidden sm:table-cell">
-                                        <span className="bg-gray-100 text-gray-700 rounded-full px-3 py-1 text-sm font-medium">{member.role.scope}</span>
+                                        <span className="bg-gray-100 text-gray-700 rounded-full px-3 py-1 text-sm font-medium">{member.role}</span>
                                     </td>
                                     <td className="p-4 hidden md:table-cell">
-                                        <span className={`rounded-full px-3 py-1 text-sm font-medium ${member.role.permission === 'Can edit' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-700'}`}>
-                                            {member.role.permission}
+                                        <span className="rounded-full px-3 py-1 text-sm font-medium bg-purple-100 text-purple-800">
+                                            {member.permissions?.access?.join(', ') || 'Restricted'}
                                         </span>
                                     </td>
                                     <td className="p-4">
@@ -93,18 +89,9 @@ const TeamView: React.FC = () => {
                             onChange={(e) => setInviteRole(e.target.value)}
                             className="w-full bg-white border border-[#E5E7EB] rounded-md px-3 py-2 text-[#111827] focus:ring-2 focus:ring-[#15803D]"
                         >
-                            <option>Handle everything (All access)</option>
-                            <option>Handle clients (Clients only)</option>
-                            <option>Handle deals (Deals only)</option>
-                            <option>Handle tasks (Tasks only)</option>
+                            <option value="Member">Member</option>
+                            <option value="Admin">Admin</option>
                         </select>
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-[#111827] mb-2">Can they edit, or only view?</label>
-                        <div className="flex items-center space-x-4">
-                            <label className="flex items-center"><input type="radio" name="permission" className="form-radio bg-white border-gray-300 text-[#15803D] focus:ring-[#166534]" defaultChecked/> <span className="ml-2">Edit & view</span></label>
-                            <label className="flex items-center"><input type="radio" name="permission" className="form-radio bg-white border-gray-300 text-[#15803D] focus:ring-[#166534]"/> <span className="ml-2">View only</span></label>
-                        </div>
                     </div>
                 </div>
                 <div className="mt-6 flex justify-end items-center space-x-4">

@@ -194,9 +194,9 @@ const OverviewTab: React.FC<BusinessLineDetailViewProps> = ({ businessLine, kanb
             <h3 className="text-lg font-semibold text-red-700 mb-2">Danger Zone</h3>
             <p className="text-sm text-brevo-text-secondary mb-3">Deleting this business line will also delete all associated clients, deals, tasks, and documents. This action cannot be undone.</p>
             <button
-                onClick={() => {
+                onClick={async () => {
                     if (window.confirm(`Are you sure you want to delete "${businessLine.name}"? This will also delete all associated clients, deals, and tasks.`)) {
-                        kanbanApi.deleteBusinessLine(businessLine.id);
+                        await kanbanApi.deleteBusinessLine(businessLine.id);
                         onBack();
                     }
                 }}

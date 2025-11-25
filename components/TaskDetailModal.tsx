@@ -145,6 +145,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const [researchData, setResearchData] = useState<{ title: string, content: string } | null>(null);
   const [isRefineModalOpen, setIsRefineModalOpen] = useState(false);
   const [refineCommand, setRefineCommand] = useState('');
+  
+  // State for smart assignee input
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
 
   useEffect(() => {
@@ -154,13 +158,36 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
             ...task,
             dueDate: task.dueDate ? new Date(new Date(task.dueDate).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : undefined
         });
+        // Initial assignee name for the input
+        const assignee = kanbanApi.teamMembers.find(tm => tm.id === task.assigneeId);
+        setAssigneeSearch(assignee ? assignee.name : '');
     }
-  }, [isOpen, task]);
+  }, [isOpen, task, kanbanApi.teamMembers]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setEditedTask(prev => ({ ...prev, [name]: value }));
   };
+
+  // Handle selecting an existing member
+  const handleAssignMember = (memberId: string, memberName: string) => {
+      setEditedTask(prev => ({ ...prev, assigneeId: memberId }));
+      setAssigneeSearch(memberName);
+  }
+
+  // Handle inviting a new email
+  const handleInviteAssign = async () => {
+      if (assigneeSearch.includes('@')) {
+          setIsInviting(true);
+          const newMember = await kanbanApi.inviteMember(assigneeSearch, { scope: 'All access', permission: 'Can edit' });
+          setIsInviting(false);
+          if (newMember) {
+              handleAssignMember(newMember.id, newMember.name);
+          } else {
+              alert("Failed to invite member.");
+          }
+      }
+  }
 
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation(); 
@@ -207,6 +234,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const currentProject = kanbanApi.projects.find(p => p.id === task.projectId);
   const currentBusinessLine = businessLines.find(bl => bl.id === task.businessLineId);
   const currentAssignee = kanbanApi.teamMembers.find(tm => tm.id === task.assigneeId);
+
+  // Filter members for search
+  const filteredMembers = kanbanApi.teamMembers.filter(m => 
+      m.name.toLowerCase().includes(assigneeSearch.toLowerCase()) || 
+      m.email.toLowerCase().includes(assigneeSearch.toLowerCase())
+  );
+  const exactMatch = filteredMembers.find(m => m.name === assigneeSearch || m.email === assigneeSearch);
+  const isEmail = assigneeSearch.includes('@');
 
   return (
     <>
@@ -263,7 +298,32 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Project</h4><select name="projectId" value={editedTask.projectId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">None</option>{kanbanApi.projects.filter(p => !editedTask.clientId || p.clientId === editedTask.clientId).map(p => <option key={p.id} value={p.id}>{p.projectName}</option>)}</select></div>
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Business Line</h4><select name="businessLineId" value={editedTask.businessLineId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">None</option>{businessLines.map(bl => <option key={bl.id} value={bl.id}>{bl.name}</option>)}</select></div>
                     <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Priority</h4><select name="priority" value={editedTask.priority || 'Medium'} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option>Low</option><option>Medium</option><option>High</option></select></div>
-                    <div className="bg-gray-50 p-3 rounded-md"><h4 className="font-semibold text-brevo-text-secondary mb-1">Assignee</h4><select name="assigneeId" value={editedTask.assigneeId || ''} onChange={handleInputChange} className="w-full bg-white border border-brevo-border rounded-md p-1"><option value="">Unassigned</option>{kanbanApi.teamMembers.map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}</select></div>
+                    
+                    {/* Smart Assignee Input */}
+                    <div className="bg-gray-50 p-3 rounded-md relative">
+                        <h4 className="font-semibold text-brevo-text-secondary mb-1">Assignee</h4>
+                        <input 
+                            type="text" 
+                            value={assigneeSearch} 
+                            onChange={(e) => setAssigneeSearch(e.target.value)}
+                            placeholder="Name or Email..."
+                            className="w-full bg-white border border-brevo-border rounded-md p-1"
+                        />
+                        {assigneeSearch && !exactMatch && (
+                            <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                {filteredMembers.map(m => (
+                                    <div key={m.id} onClick={() => handleAssignMember(m.id, m.name)} className="p-2 hover:bg-gray-100 cursor-pointer">
+                                        {m.name} <span className="text-xs text-gray-500">({m.email})</span>
+                                    </div>
+                                ))}
+                                {isEmail && filteredMembers.length === 0 && (
+                                    <div onClick={handleInviteAssign} className="p-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-medium">
+                                        {isInviting ? 'Inviting...' : `Invite & Assign "${assigneeSearch}"`}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </>
             ) : (
                 <>

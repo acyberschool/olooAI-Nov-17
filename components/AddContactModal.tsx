@@ -5,7 +5,7 @@ import { Contact } from '../types';
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<Contact, 'id' | 'clientId'>) => void;
+  onSave: (data: { name: string; role: string; email: string; phone: string }) => void;
 }
 
 const AddContactModal: React.FC<AddContactModalProps> = ({ isOpen, onClose, onSave }) => {

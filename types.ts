@@ -15,8 +15,65 @@ export enum TaskType {
   Meeting = 'Meeting',
 }
 
+export interface Organization {
+    id: string;
+    name: string;
+    ownerId: string;
+}
+
+export interface OrganizationMember {
+    id: string;
+    organizationId: string;
+    userId?: string;
+    name: string;
+    email: string;
+    role: 'Owner' | 'Admin' | 'Member';
+    permissions: { access: string[] }; // e.g. ['clients', 'hr', 'sales']
+    status: 'Active' | 'Invited';
+}
+
+// --- NEW MODULE TYPES ---
+
+export interface Event {
+    id: string;
+    organizationId: string;
+    name: string;
+    date?: string;
+    location?: string;
+    status: 'Planning' | 'Confirmed' | 'Completed';
+    checklist: { id: string; text: string; isDone: boolean; owner?: string }[];
+    partners?: string;
+    impactNotes?: string;
+}
+
+export interface HRCandidate {
+    id: string;
+    organizationId: string;
+    name: string;
+    roleApplied: string;
+    email: string;
+    status: 'Applied' | 'Screening' | 'Interview' | 'Offer' | 'Hired' | 'Rejected';
+    resumeUrl?: string;
+    notes?: string;
+    interviewDate?: string;
+}
+
+export interface HREmployee {
+    id: string;
+    organizationId: string;
+    name: string;
+    role: string;
+    type: 'Full-time' | 'Contractor';
+    email: string;
+    startDate: string;
+    status: 'Active' | 'Onboarding' | 'Offboarding';
+}
+
+// --- EXISTING TYPES UPDATED WITH ORG_ID ---
+
 export interface Contact {
     id: string;
+    organizationId: string;
     clientId: string;
     name: string;
     role: string;
@@ -26,6 +83,7 @@ export interface Contact {
 
 export interface Task {
   id: string;
+  organizationId: string;
   title: string;
   description?: string;
   status: KanbanStatus;
@@ -44,6 +102,7 @@ export interface Task {
 
 export interface BusinessLine {
   id: string;
+  organizationId: string;
   name: string;
   description: string;
   customers: string;
@@ -58,18 +117,19 @@ export interface PlaybookStep {
 
 export interface Playbook {
   id: string;
+  organizationId: string;
   businessLineId: string;
   steps: PlaybookStep[];
 }
 
 export interface Client {
   id:string;
+  organizationId: string;
   name: string;
   description: string;
   aiFocus: string;
   businessLineId: string;
   suggestions?: Suggestion[];
-  // New CRM Fields
   contactPersonName?: string;
   contactPersonEmail?: string;
   contactPersonNumber?: string;
@@ -77,17 +137,16 @@ export interface Client {
   officeNumber?: string;
   linkedinUrl?: string;
   twitterUrl?: string;
-  // AI Proposals
   proposedLastTouchSummary?: string;
   proposedNextAction?: string;
   proposedNextActionDueDate?: string;
-  // Lead Scoring
   leadScore?: number;
   leadScoreReason?: string;
 }
 
 export interface Deal {
   id: string;
+  organizationId: string;
   name: string;
   description: string;
   status: 'Open' | 'Closed - Won' | 'Closed - Lost';
@@ -99,11 +158,15 @@ export interface Deal {
   currency: 'USD' | 'EUR' | 'GBP' | 'KES';
   revenueModel: 'Revenue Share' | 'Full Pay';
   amountPaid: number;
-  // AI Proposals
+  createdAt?: string;
   proposedLastTouchSummary?: string;
   proposedNextAction?: string;
   proposedNextActionDueDate?: string;
   proposedStatus?: 'Open' | 'Closed - Won' | 'Closed - Lost';
+  // Sales Coaching
+  qualificationScore?: number;
+  velocityBlockers?: string;
+  coachingNotes?: string;
 }
 
 export type ProjectStage = 'Lead' | 'In design' | 'Live' | 'Closing' | 'Dormant';
@@ -111,6 +174,7 @@ export type ProjectDealType = 'Revenue Share' | 'Fee-based' | 'Grant' | 'In-kind
 
 export interface Project {
   id: string;
+  organizationId: string;
   partnerName: string;
   projectName: string;
   goal: string;
@@ -126,7 +190,6 @@ export interface Project {
   nextActionDueDate: string;
   opportunityNote: string;
   clientId?: string;
-  // Fields for AI proposals
   proposedLastTouchSummary?: string;
   proposedNextAction?: string;
   proposedNextActionDueDate?: string;
@@ -138,6 +201,7 @@ export type DocumentOwnerType = 'businessLine' | 'client' | 'deal' | 'project';
 
 export interface Document {
   id: string;
+  organizationId: string;
   name: string;
   category: DocumentCategory;
   url: string; 
@@ -156,6 +220,7 @@ export type CRMEntryType = 'call' | 'meeting' | 'email' | 'note' | 'file' | 'mes
 
 export interface CRMEntry {
   id: string;
+  organizationId: string;
   clientId: string;
   dealId?: string;
   projectId?: string;
@@ -173,21 +238,13 @@ export interface Suggestion {
   taskData: Partial<Omit<Task, 'id' | 'status'>>;
 }
 
-export type RoleScope = 'All access' | 'Clients only' | 'Deals only' | 'Tasks only';
-export type RolePermission = 'Can edit' | 'Read-only';
-
 export interface Role {
-  scope: RoleScope;
-  permission: RolePermission;
+  scope: string;
+  permission: string;
 }
 
-export interface TeamMember {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  status: 'Active' | 'Invited';
-}
+// This is now handled by OrganizationMember
+export interface TeamMember extends OrganizationMember {}
 
 export interface Prospect {
     id: string;
@@ -230,6 +287,7 @@ export interface PlatformInsight {
 
 export interface SocialPost {
     id: string;
+    organizationId: string;
     businessLineId: string;
     date: string; // ISO Date String YYYY-MM-DD
     content: string; // The caption or text
@@ -262,9 +320,9 @@ export interface RouterBrainResult {
   tasks: RouterTask[];
   note: RouterNote | null;
   summary: string | null;
-  businessLine?: Omit<BusinessLine, 'id'>;
-  client?: Omit<Client, 'id' | 'businessLineId'> & { businessLineName?: string };
-  deal?: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & { clientName: string };
+  businessLine?: Omit<BusinessLine, 'id' | 'organizationId'>;
+  client?: Omit<Client, 'id' | 'businessLineId' | 'organizationId'> & { businessLineName?: string };
+  deal?: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId' | 'organizationId'> & { clientName: string };
   project?: {
       partnerName: string;
       projectName: string;

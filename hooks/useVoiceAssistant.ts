@@ -8,7 +8,7 @@ type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 interface UseVoiceAssistantProps {
   onBoardItemCreate: (itemData: Partial<Task>) => string | Promise<string>;
   onCrmEntryCreate: (data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => string;
-  onTaskUpdate: (taskTitle: string, newStatus: KanbanStatus) => string;
+  onTaskUpdate: (taskTitle: string, newStatus: KanbanStatus) => string | Promise<string>;
   onBusinessLineCreate: (data: Omit<BusinessLine, 'id'>) => Promise<string> | string;
   onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => Promise<string> | string;
   onDealCreate: (data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string; clientId?: string; businessLineId?: string;}) => Promise<string> | string;
