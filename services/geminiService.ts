@@ -114,6 +114,30 @@ export async function generateJsonWithSearch(prompt: string, schema: any): Promi
     }
 }
 
+export async function generateImages(prompt: string): Promise<string | null> {
+    const ai = getAiInstance();
+    try {
+        const response = await ai.models.generateImages({
+            model: 'imagen-3.0-generate-001',
+            prompt: prompt,
+            config: {
+                numberOfImages: 1,
+                aspectRatio: '1:1',
+                outputMimeType: 'image/jpeg'
+            }
+        });
+        
+        const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
+        if (imageBytes) {
+            return `data:image/jpeg;base64,${imageBytes}`;
+        }
+        return null;
+    } catch (e) {
+        console.error("Image Generation Error:", e);
+        return null;
+    }
+}
+
 export async function generateVideos(prompt: string): Promise<string | null> {
     const ai = getAiInstance();
     try {
@@ -146,7 +170,10 @@ export async function generateVideos(prompt: string): Promise<string | null> {
              // Append API Key to fetch the actual bytes if needed, or just return URI for display if supported
              // Note: Browser might not be able to fetch directly due to CORS.
              // We will return the URI with the key appended for the frontend to try and use.
-             return `${videoUri}&key=${process.env.API_KEY}`; 
+             // Using process.env.API_KEY safely here as it's client side logic helper
+             // @ts-ignore
+             const key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
+             return `${videoUri}&key=${key}`; 
         }
         return null;
 
