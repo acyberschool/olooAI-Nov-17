@@ -268,7 +268,7 @@ export const useKanban = () => {
       const { data: inserted, error } = await supabase.from('deals').insert(payload).select().single();
       if (!error && inserted) {
           setDeals(prev => [inserted as Deal, ...prev]);
-          return `Deal "${inserted.name}" created.`;
+          return inserted; // Return full object for chaining
       }
       return "Failed to create deal.";
   }, [orgId, clients, addClient, businessLines]);
@@ -305,7 +305,7 @@ export const useKanban = () => {
       const { data: inserted, error } = await supabase.from('projects').insert(payload).select().single();
       if (!error && inserted) {
           setProjects(prev => [inserted as Project, ...prev]);
-          return `Project "${inserted.project_name}" created.`;
+          return inserted; // Return object for chaining
       }
       return "Failed to create project.";
   }, [orgId, clients, addClient, businessLines]);
@@ -449,6 +449,10 @@ export const useKanban = () => {
           projects: projects.map(p => p.projectName)
       }, context, "User is active", file);
 
+      let createdClientId: string | undefined = undefined;
+      let createdDealId: string | undefined = undefined;
+      let createdProjectId: string | undefined = undefined;
+
       if (result.action === 'create_business_line' && result.businessLine) {
           await addBusinessLine(result.businessLine);
       }
@@ -461,28 +465,38 @@ export const useKanban = () => {
            }
            if (!blId && businessLines.length > 0) blId = businessLines[0].id;
            if (blId) {
-               await addClient({
+               const newClient = await addClient({
                    name: result.client.name,
                    description: result.client.description,
                    aiFocus: result.client.aiFocus,
                    businessLineId: blId
                });
+               if (newClient) createdClientId = newClient.id;
            }
       }
       
       if (result.action === 'create_deal' && result.deal) {
-          await addDeal({
+          const newDeal = await addDeal({
               name: result.deal.name,
               description: result.deal.description,
               clientName: result.deal.clientName,
               value: result.deal.value,
               currency: result.deal.currency,
               revenueModel: result.deal.revenueModel
-          });
+          }) as Deal | string;
+          
+          if (typeof newDeal !== 'string' && newDeal.id) {
+              createdDealId = newDeal.id;
+              createdClientId = newDeal.clientId; // Capture inferred client ID
+          }
       }
 
       if (result.action === 'create_project' && result.project) {
-          await addProject(result.project);
+          const newProject = await addProject(result.project) as Project | string;
+          if (typeof newProject !== 'string' && newProject.id) {
+              createdProjectId = newProject.id;
+              createdClientId = newProject.clientId;
+          }
       }
 
       if (result.action === 'create_event' && result.event) {
@@ -516,13 +530,26 @@ export const useKanban = () => {
                   const member = teamMembers.find(m => m.name.toLowerCase().includes(t.assignee_name!.toLowerCase()));
                   if (member) assigneeId = member.id;
               }
+              
+              // Dynamic ID Resolution for Chained Actions
+              let targetClientId = t.client_name ? clients.find(c => c.name === t.client_name)?.id : context.clientId;
+              if (!targetClientId && createdClientId) targetClientId = createdClientId;
+
+              let targetDealId = t.deal_name ? deals.find(d => d.name === t.deal_name)?.id : context.dealId;
+              if (!targetDealId && createdDealId) targetDealId = createdDealId;
+
+              let targetProjectId = undefined;
+              if (createdProjectId) targetProjectId = createdProjectId;
 
               addTask({ 
                   title: t.title, 
                   dueDate: t.due_date || undefined,
                   priority: t.priority || 'Medium',
                   assigneeId: assigneeId,
-                  businessLineName: t.business_line_name || undefined
+                  businessLineName: t.business_line_name || undefined,
+                  clientId: targetClientId,
+                  dealId: targetDealId,
+                  projectId: targetProjectId
               });
           });
       }
@@ -535,13 +562,15 @@ export const useKanban = () => {
                const c = clients.find(cl => cl.name.toLowerCase() === result.client?.name?.toLowerCase());
                clientId = c?.id;
            }
+           if (!clientId && createdClientId) clientId = createdClientId; // Use new client
+
            if (clientId) {
                addCRMEntry({
                    clientId,
                    summary: noteContent,
                    type: channel as CRMEntryType,
                    rawContent: text,
-                   dealId: context.dealId
+                   dealId: context.dealId || createdDealId
                });
            }
       }
@@ -549,7 +578,6 @@ export const useKanban = () => {
   }, [clients, deals, businessLines, teamMembers, projects, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate, addSocialPost]);
 
   // --- DEEP INTELLIGENCE & HELPERS (Keep existing implementations) ---
-  // ... [Rest of file is identical to previous version, just re-exported below for completeness]
   
   const generateLeadScore = async (client: Client) => {
       if(!orgId) return;
@@ -585,6 +613,35 @@ export const useKanban = () => {
       const res = await generateJsonWithSearch(prompt, schema);
       if(res) await updateProject(id, { proposedLastTouchSummary: res.summary, proposedNextAction: res.nextAction, proposedNextActionDueDate: res.nextActionDate, proposedStage: res.stage as any });
   };
+
+  const approveClientUpdate = async(id: string) => {
+      const client = clients.find(c => c.id === id);
+      if(client) {
+          await updateClient(id, {
+              lastTouchSummary: client.proposedLastTouchSummary, // Assuming this field exists or mapping to description update
+              // Actual fields depend on schema, here we assume proposed fields are what we want to keep or move
+              proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null
+          } as any);
+      }
+  };
+  const clearProposedClientUpdate = async(id: string) => updateClient(id, { proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null });
+
+  const approveDealUpdate = async(id: string) => {
+      const deal = deals.find(d => d.id === id);
+      if(deal) {
+          await updateDeal(id, { status: deal.proposedStatus || deal.status, proposedStatus: null, proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null });
+      }
+  };
+  const clearProposedDealUpdate = async(id: string) => updateDeal(id, { proposedStatus: null, proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null });
+
+  const approveProjectUpdate = async(id: string) => {
+        const project = projects.find(p => p.id === id);
+        if(project) {
+            await updateProject(id, { stage: project.proposedStage || project.stage, lastTouchSummary: project.proposedLastTouchSummary, nextAction: project.proposedNextAction, nextActionDueDate: project.proposedNextActionDueDate, proposedStage: null, proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null });
+        }
+  };
+  const clearProposedProjectUpdate = async(id: string) => updateProject(id, { proposedStage: null, proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null });
+
 
   const refineTaskChecklist = async (taskId: string, command: string) => {
       const task = tasks.find(t => t.id === taskId);
@@ -688,9 +745,9 @@ export const useKanban = () => {
       },
       generateSocialImage: async (prompt: string) => await generateImages(prompt),
       generateSocialVideo: async (prompt: string) => await generateVideos(prompt),
-      generateLeadScore, updateClientFromInteraction, approveClientUpdate: async(id: string) => { /* Implemented above */ }, clearProposedClientUpdate: async(id: string) => { /* Implemented above */ },
-      updateDealFromInteraction, approveDealUpdate: async(id: string) => { /* Implemented above */ }, clearProposedDealUpdate: async(id: string) => { /* Implemented above */ },
-      updateProjectFromInteraction, approveProjectUpdate: async(id: string) => { /* Implemented above */ }, clearProposedProjectUpdate: async(id: string) => { /* Implemented above */ },
+      generateLeadScore, updateClientFromInteraction, approveClientUpdate, clearProposedClientUpdate,
+      updateDealFromInteraction, approveDealUpdate, clearProposedDealUpdate,
+      updateProjectFromInteraction, approveProjectUpdate, clearProposedProjectUpdate,
       generateDocumentDraft, generateMarketingCollateralContent: async (prompt: string, type: string, owner: any) => await generateContentWithSearch(`Create ${type} for ${owner.name}. ${prompt}`),
       enhanceUserPrompt: async (prompt: string) => await generateContentWithSearch(`Enhance prompt: "${prompt}"`),
       logPaymentOnDeal: async (id: string, amount: number, note: string) => {
