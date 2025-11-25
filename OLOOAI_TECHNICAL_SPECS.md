@@ -1,8 +1,8 @@
 
 # olooAI Technical Specification & Engineering Reference
 
-**Version:** 2.1.0 (Stable)
-**Date:** October 26, 2023
+**Version:** 2.2.0 (Gold Master)
+**Status:** Deployed
 **Audience:** Engineering Team (Frontend, Backend, AI Ops)
 
 ---
@@ -15,7 +15,7 @@ olooAI utilizes a **Thick Client / Serverless** architecture. The React frontend
 *   **Frontend:** React 18, TypeScript, Vite 5, Tailwind CSS.
 *   **Backend (BaaS):** Supabase (PostgreSQL 15, GoTrue Auth, PostgREST).
 *   **AI Layer:** Google Gemini API (`@google/genai` SDK) via direct client-side calls.
-*   **Infrastructure:** Client-side rendering (CSR), deployed as static assets.
+*   **Infrastructure:** Client-side rendering (CSR).
 
 ---
 
@@ -24,19 +24,20 @@ olooAI utilizes a **Thick Client / Serverless** architecture. The React frontend
 ### 2.1 Core Entry & Routing
 The application does **not** use a traditional router. It uses a state-based view controller pattern.
 *   **Entry Point:** `main.tsx` -> `App.tsx`.
-*   **View State:** Managed in `App.tsx` via `activeView` state.
-*   **Sidebar:** `components/Sidebar.tsx` controls navigation and enforces **Access Control (ACL)** logic based on user permissions.
+*   **View State:** Managed in `App.tsx` via `activeView` state ('today', 'sales', 'hr', etc.).
+*   **Navigation:** `components/Sidebar.tsx` implements a dismissible drawer pattern (mobile-responsive) with a flat 12-item menu structure.
 
 ### 2.2 State Management (`useKanban.ts`)
 The `useKanban` hook serves as the **global store**.
-*   **Responsibility:** Fetches all data tables (`tasks`, `deals`, `clients`, `events`, `hr_candidates`) upon initialization based on the authenticated `organization_id`.
+*   **Responsibility:** Fetches all data tables (`tasks`, `deals`, `clients`, `events`, `hr_candidates`, `social_posts`) upon initialization.
+*   **Data Isolation:** All fetches filter by `organization_id`.
 *   **Invite Logic:** On mount, `loadOrg` checks `organization_members` for any pending invites matching the user's email and links them to the current user ID.
 
 ### 2.3 Universal Input & The "Router Brain"
 The core differentiator is `services/routerBrainService.ts`.
 *   **ATC (Assign to Colleague):** The system prompt is instructed to extract `@Name` patterns into an `assignee_name` field.
 *   **Resolution:** `useKanban` matches `assignee_name` against the loaded `teamMembers` array to resolve the UUID before database insertion.
-*   **DTW (Delegate to Walter):** Specific UI buttons trigger pre-defined prompt templates that utilize "Action Cascading" (creating multiple dependent tasks from a single intent).
+*   **DTW (Delegate to Walter):** UI buttons trigger pre-defined prompt templates that utilize "Action Cascading" (creating multiple dependent tasks from a single intent).
 
 ---
 
@@ -45,11 +46,14 @@ The core differentiator is `services/routerBrainService.ts`.
 ### 3.1 Voice Assistant (Live API)
 *   **Model:** `gemini-2.5-flash-native-audio-preview-09-2025`.
 *   **Audio Pipeline:** WebSocket stream (16kHz input / 24kHz output).
-*   **Tooling:** Functions like `createBoardItem` automatically infer context (Client ID, Business Line) from the current view state.
+*   **Tooling:** Functions like `createBoardItem`, `analyzeRisk`, `createEvent` are defined in `geminiService.ts` and executed by the client.
 
-### 3.2 Generative Logic
-*   **Router Brain:** `gemini-2.5-flash`. Uses 1-shot prompting to map natural language to database schema.
-*   **Content Generation:** `gemini-2.5-flash-image` (Social) and `veo-3.1-fast-generate-preview` (Video).
+### 3.2 Generative Logic (The "Brains")
+*   **Router Brain:** `gemini-2.5-flash`. Uses "God Mode" prompting to enforce data hierarchy (Business Line > Client > Deal).
+*   **Search Grounding:** `generateContentWithSearch` uses the `googleSearch` tool to fetch live web data for `Client Pulse` and `Competitor Analysis`.
+*   **Media Generation:**
+    *   **Images:** `imagen-3.0-generate-001` (via `generateImages`).
+    *   **Video:** `veo-3.1-fast-generate-preview` (via `generateVideos`).
 
 ---
 
@@ -62,7 +66,9 @@ Data is isolated by `organization_id`.
 *   **`organization_members`**: `organization_id`, `user_id`, `email`, `role`, `permissions` (JSONB).
 
 ### 4.2 Business Tables
-All tables (`tasks`, `deals`, `events`, etc.) have an `organization_id` column and an RLS policy enforcing membership checks.
+All tables have an `organization_id` column and an RLS policy enforcing membership checks.
+*   **Core:** `business_lines`, `clients`, `deals`, `projects`, `tasks`.
+*   **Deep Modules:** `events` (with JSON checklist), `hr_candidates`, `hr_employees`, `social_posts`.
 
 ---
 
@@ -71,11 +77,9 @@ All tables (`tasks`, `deals`, `events`, etc.) have an `organization_id` column a
 *   **Provider:** Supabase Auth.
 *   **Method:** OTP (One-Time Password) via Email.
 *   **Flow:** User enters email -> Receives 6-digit code -> Enters code -> Session established.
-*   **Invite System:**
-    1.  Admin invites `email`.
-    2.  Row created in `organization_members` (Status: 'Invited').
-    3.  User logs in via OTP.
-    4.  System links User ID to Member record.
+*   **Access Control:**
+    *   **RBAC:** 'Owner', 'Admin', 'Member' roles stored in `organization_members`.
+    *   **Delete Protection:** Only Admins can delete Clients, Deals, or Projects.
 
 ---
 

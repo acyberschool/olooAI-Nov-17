@@ -2,40 +2,42 @@
 import { RouterBrainResult, GeminiType } from '../types';
 import { getAiInstance } from '../config/geminiConfig';
 
-const getSystemPrompt = (knownData: { clients: string[], deals: string[], businessLines: string[], teamMembers: string[] }, context: any, platform_activity_summary: string) => `
+const getSystemPrompt = (knownData: { clients: string[], deals: string[], businessLines: string[], teamMembers: string[], projects: string[] }, context: any, platform_activity_summary: string) => `
 You are **Walter**, the Autonomous Operating System of olooAI. 
 You are **NOT** a chatbot. You are a **CHAIN REACTION ENGINE**.
 
-**YOUR PRIME DIRECTIVE: DATA CONSISTENCY & STRICT HIERARCHY**
-The system enforces a strict relationship model. You MUST verify connections.
+**YOUR MISSION:**
+Take vague, high-level user intent and transform it into **structured, connected, and complete business actions**.
+Never ask for clarification if you can infer, guess, or use a sensible default. **Action is better than inaction.**
 
-**MANDATORY HIERARCHY RULES:**
-1.  **Business Line (Root):** Everything starts here.
-2.  **Client:** MUST belong to a **Business Line**. (If creating a client, you MUST infer or ask for the Business Line).
-3.  **Deal:** MUST belong to a **Client**.
-4.  **Project:** MUST belong to a **Client**.
-5.  **Sales Record:** MUST belong to a **Client**.
-6.  **Event:** MUST belong to a **Business Line**.
-7.  **Task:** MUST belong to a **Business Line**.
-    *   *Exception:* If a Task has NO Business Line connection, explicitly tag it as **"Personal"** (leave business_line_name null).
+**KNOWLEDGE BASE (INTERNAL DATA):**
+- Business Lines: ${knownData.businessLines.join(', ')}
+- Clients: ${knownData.clients.join(', ')}
+- Deals: ${knownData.deals.join(', ')}
+- Projects: ${knownData.projects.join(', ')}
+- Team: ${knownData.teamMembers.join(', ')}
+- Current Screen Context: ${JSON.stringify(context)}
 
-**RULES OF ENGAGEMENT:**
-1.  **CONNECT THE DOTS:** If the user says "New deal for Acme", you MUST find which Client "Acme" is, and which Business Line "Acme" belongs to.
-2.  **SMART DEFAULTING:** If data is missing (e.g., creating a Deal but no Client exists), infer the Client creation action first.
-3.  **CONTEXT AWARE:** You see the current screen: ${JSON.stringify(context)}. Use this to link tasks to the active Deal or Client.
+**MANDATORY DATA HIERARCHY & INFERENCE RULES:**
+1.  **Client Creation:** MUST belong to a **Business Line**.
+    *   *Inference:* Match the client's nature to a Business Line name. If unsure, assign to the first available Business Line.
+2.  **Deal/Project/Sales:** MUST belong to a **Client**.
+    *   *Inference:* If user says "Deal for Acme", find "Acme" in Clients. If "Acme" doesn't exist, **CREATE "Acme" as a Client first** (implied action).
+3.  **Task:** MUST belong to a **Business Line** (or Client/Deal).
+    *   *Fallback:* If no connection found, explicitly tag as "Personal" (leave business_line_name null).
+4.  **Event/Social Post:** MUST link to a Business Line or Project.
+
+**ACTION CASCADING (THE "SUPER-INTELLIGENCE"):**
+Don't just do what is asked. Do what is *needed*.
+*   **"Onboard Client X"** -> Create Client X + Create Task "Send Contract" + Create Task "Setup Billing".
+*   **"Plan Event Y"** -> Create Event Y + Create Task "Book Venue" + Create Task "Invite Speakers".
+*   **"New Deal Z"** -> Create Deal Z + Create Note "Log initial interest" + Create Task "Follow up in 2 days".
 
 **OUTPUT SCHEMA:**
-Return valid JSON.
-- action: "create_task", "create_deal", etc.
-- tasks: [ARRAY of task objects]
-- note: { text, channel }
-- [entity]: object (the primary entity being created)
-
-**Known Data:**
-Business Lines: ${knownData.businessLines.join(', ')}
-Clients: ${knownData.clients.join(', ')}
-Deals: ${knownData.deals.join(', ')}
-Team: ${knownData.teamMembers.join(', ')}
+Return a SINGLE JSON object.
+- **action**: The primary intent (e.g., 'create_deal').
+- **tasks**: An ARRAY of tasks. (Include the primary requested task AND inferred follow-up tasks).
+- **[entity]**: The object for the primary entity created (deal, client, etc.).
 `;
 
 const routerBrainSchema = {
@@ -43,7 +45,7 @@ const routerBrainSchema = {
     properties: {
         action: { 
             type: GeminiType.STRING, 
-            enum: ['create_task', 'create_note', 'both', 'update_task', 'ignore', 'create_business_line', 'create_client', 'create_deal', 'create_project', 'create_event', 'create_candidate'] 
+            enum: ['create_task', 'create_note', 'both', 'update_task', 'ignore', 'create_business_line', 'create_client', 'create_deal', 'create_project', 'create_event', 'create_candidate', 'create_social_post'] 
         },
         tasks: {
             type: GeminiType.ARRAY,
@@ -51,13 +53,12 @@ const routerBrainSchema = {
                 type: GeminiType.OBJECT,
                 properties: {
                     title: { type: GeminiType.STRING },
-                    due_date: { type: GeminiType.STRING, nullable: true },
+                    due_date: { type: GeminiType.STRING, description: "ISO String. Infer 'tomorrow 9am' if not specified." },
                     client_name: { type: GeminiType.STRING, nullable: true },
                     deal_name: { type: GeminiType.STRING, nullable: true },
                     business_line_name: { type: GeminiType.STRING, nullable: true },
                     priority: { type: GeminiType.STRING, enum: ['Low', 'Medium', 'High'], nullable: true },
-                    update_hint: { type: GeminiType.STRING, nullable: true },
-                    assignee_name: { type: GeminiType.STRING, nullable: true },
+                    assignee_name: { type: GeminiType.STRING, nullable: true, description: "Extract from '@Name' or 'assign to Name'" },
                 },
                 required: ['title']
             }
@@ -67,7 +68,7 @@ const routerBrainSchema = {
             nullable: true,
             properties: {
                 text: { type: GeminiType.STRING },
-                channel: { type: GeminiType.STRING }
+                channel: { type: GeminiType.STRING, enum: ['call', 'email', 'meeting', 'note', 'message'] }
             },
             required: ['text', 'channel']
         },
@@ -90,7 +91,7 @@ const routerBrainSchema = {
                 name: { type: GeminiType.STRING },
                 description: { type: GeminiType.STRING },
                 aiFocus: { type: GeminiType.STRING },
-                businessLineName: { type: GeminiType.STRING }
+                businessLineName: { type: GeminiType.STRING, description: "Must match an existing Business Line or be a valid new one." }
             },
             required: ['name', 'description', 'aiFocus']
         },
@@ -140,6 +141,17 @@ const routerBrainSchema = {
                 email: { type: GeminiType.STRING },
             },
             required: ['name', 'roleApplied']
+        },
+        socialPost: {
+            type: GeminiType.OBJECT,
+            nullable: true,
+            properties: {
+                content: { type: GeminiType.STRING },
+                channel: { type: GeminiType.STRING },
+                visualPrompt: { type: GeminiType.STRING, description: "Prompt for image generation" },
+                date: { type: GeminiType.STRING }
+            },
+            required: ['content', 'channel']
         }
     },
     required: ['action', 'tasks', 'note', 'summary']

@@ -451,6 +451,21 @@ const createCandidateDeclaration: GeminiFunctionDeclaration = {
     },
 };
 
+const createSocialPostDeclaration: GeminiFunctionDeclaration = {
+    name: 'createSocialPost',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Drafts a social media post for the marketing calendar.',
+        properties: {
+            content: { type: GeminiType.STRING, description: 'The text caption for the post.' },
+            channel: { type: GeminiType.STRING, description: 'Platform (Instagram, LinkedIn, etc.).' },
+            visualPrompt: { type: GeminiType.STRING, description: 'Prompt for generating the visual asset.' },
+            date: { type: GeminiType.STRING, description: 'Scheduled date (YYYY-MM-DD).' }
+        },
+        required: ['content', 'channel'],
+    },
+};
+
 const updateDealStatusDeclaration: GeminiFunctionDeclaration = {
     name: 'updateDealStatus',
     parameters: {
@@ -489,6 +504,7 @@ const assistantTools = [{ functionDeclarations: [
     createProjectDeclaration,
     createEventDeclaration,
     createCandidateDeclaration,
+    createSocialPostDeclaration,
     updateDealStatusDeclaration,
     findProspectsDeclaration,
     queryPlatformDeclaration,

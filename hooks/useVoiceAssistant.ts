@@ -1,7 +1,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { connectToLiveSession, decode, decodeAudioData, createPcmBlob } from '../services/geminiService';
-import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType, Project, Event, HRCandidate } from '../types';
+import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType, Project, Event, HRCandidate, SocialPost } from '../types';
 
 type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
@@ -15,6 +15,7 @@ interface UseVoiceAssistantProps {
   onProjectCreate?: (data: Partial<Omit<Project, 'id'>> & { partnerName: string; projectName: string; goal: string; }) => Promise<string> | string;
   onEventCreate?: (data: Partial<Event>) => Promise<string> | string;
   onCandidateCreate?: (data: Partial<HRCandidate>) => Promise<string> | string;
+  onSocialPostCreate?: (data: Partial<SocialPost>) => Promise<string> | string;
   onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed - Won' | 'Closed - Lost') => Promise<string> | string;
   onTurnComplete?: (userTranscript: string, assistantTranscript: string) => void;
   onFindProspects?: (data: { businessLineName: string }) => Promise<string>;
@@ -40,6 +41,7 @@ export const useVoiceAssistant = ({
   onProjectCreate,
   onEventCreate,
   onCandidateCreate,
+  onSocialPostCreate,
   onDealStatusUpdate,
   onTurnComplete,
   onFindProspects,
@@ -123,7 +125,7 @@ export const useVoiceAssistant = ({
         let result: string | Promise<string> = "An unknown error occurred.";
         let finalArgs = { ...fc.args };
 
-        // Context Injection logic (Simplified)
+        // Context Injection logic
         if (currentDealId && ['createBoardItem', 'createCrmEntry'].includes(fc.name)) finalArgs.dealId = currentDealId;
         
         switch (fc.name) {
@@ -136,12 +138,13 @@ export const useVoiceAssistant = ({
             case 'createProject': if(onProjectCreate) result = onProjectCreate(finalArgs); break;
             case 'createEvent': if(onEventCreate) result = onEventCreate(finalArgs); break;
             case 'createCandidate': if(onCandidateCreate) result = onCandidateCreate(finalArgs); break;
+            case 'createSocialPost': if(onSocialPostCreate) result = onSocialPostCreate(finalArgs); break;
             case 'updateDealStatus': if(currentDealId) result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as any); else result = "View deal first."; break;
             case 'findProspects': if(onFindProspects) result = onFindProspects(finalArgs as any); break;
             case 'queryPlatform': if(onPlatformQuery) result = onPlatformQuery(finalArgs.query as string); break;
             case 'sendEmail': window.location.href = `mailto:${finalArgs.recipientEmail}?subject=${encodeURIComponent(finalArgs.subject)}&body=${encodeURIComponent(finalArgs.body)}`; result = "Opening email..."; break;
             
-            // New Deep Intelligence Hooks
+            // Deep Intelligence Hooks
             case 'analyzeRisk': if(onAnalyzeRisk) result = onAnalyzeRisk(finalArgs as any); else result = "Risk analysis not available here."; break;
             case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available here."; break;
             case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available here."; break;
@@ -207,20 +210,14 @@ export const useVoiceAssistant = ({
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         nextStartTimeRef.current = 0;
         
-        // Aggressive System Prompt with Deep Reasoning
-        const systemInstruction = `You are Walter, the Autonomous Operating System.
-**PRIME DIRECTIVE:** ACTION & DEEP REASONING.
-1. **EXECUTE INSTANTLY:** Call functions immediately. No "Sure" or "I can help".
-2. **DEEP DIVES:** 
-   - If user asks about "Risk" -> call \`analyzeRisk\`.
-   - If user asks about "Negotiation" -> call \`analyzeNegotiation\`.
-   - If user asks "What's happening with Client X?" -> call \`getClientPulse\`.
-3. **INFER DETAILS:** 
-   - Missing Date? -> "Tomorrow 9am".
-   - Hiring? -> Infer role, create Candidate.
-   - Event? -> Infer type, create Event.
-4. **CASCADE ACTIONS:**
-   - "New Deal" -> Create Deal AND 3 follow-up tasks.
+        const systemInstruction = `You are Walter, the Super-Intelligent Autonomous Operating System.
+**PRIME DIRECTIVE:** ACTION & KNOWLEDGE SYNTHESIS.
+1. **KNOW EVERYTHING:** You have access to the user's data, the internet, and deep reasoning. Use them all.
+2. **EXECUTE:** Do not ask "Would you like me to?". JUST DO IT.
+3. **INFER:** If a user says "Event next Friday", calculate the date. If they say "New Deal for Acme", assume they mean the client "Acme Corp".
+4. **CASCADE:** Creating a client? Also create a task to "Send Welcome Email". Creating an event? Also create a task to "Book Venue".
+5. **SEARCH:** If the user asks about a company, risk, or trend, USE YOUR TOOLS to search the web.
+6. **HIERARCHY:** Always link Clients to Business Lines, and Deals to Clients. If not specified, make your best intelligent guess based on context.
 `;
 
         const connect = () => {

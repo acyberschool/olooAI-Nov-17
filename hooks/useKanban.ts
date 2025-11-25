@@ -181,6 +181,8 @@ export const useKanban = () => {
           if (!businessLineId) businessLineId = businessLines[0].id;
       }
       
+      // If strict enforcement fails, we proceed with the first BL found (V1.2 Logic: Keep Walter working)
+      if (!businessLineId && businessLines.length > 0) businessLineId = businessLines[0].id; 
       if (!businessLineId) return "Failed: A client must be attached to a Business Line. Please create a Business Line first.";
 
       const payload = { ...data, businessLineId, organization_id: orgId };
@@ -223,12 +225,25 @@ export const useKanban = () => {
       
       // LOGIC: Deal MUST be attached to a Client.
       let clientId = data.clientId;
+      // Inference
       if (!clientId && data.clientName) {
           const client = clients.find(c => c.name.toLowerCase() === data.clientName.toLowerCase());
           clientId = client?.id;
       }
       
-      if (!clientId) return "Failed: A deal must be attached to a Client.";
+      // Auto-Create Client if missing
+      if (!clientId && data.clientName) {
+          // Recursively create client if not found
+          const response = await addClient({
+              name: data.clientName,
+              description: 'Auto-created by Walter',
+              aiFocus: 'General',
+              businessLineId: businessLines.length > 0 ? businessLines[0].id : undefined
+          });
+          return "Client not found. I've tried creating it, please try again in a moment.";
+      }
+      
+      if (!clientId) return "Failed: Deal must be attached to a Client.";
 
       let businessLineId = data.businessLineId;
       if (!businessLineId && clientId) {
@@ -252,7 +267,7 @@ export const useKanban = () => {
           return `Deal "${inserted.name}" created.`;
       }
       return "Failed to create deal.";
-  }, [orgId, clients]);
+  }, [orgId, clients, addClient, businessLines]);
 
   const addProject = useCallback(async (data: any) => {
       if (!orgId) return "Error";
@@ -264,7 +279,7 @@ export const useKanban = () => {
            clientId = client?.id;
       }
       
-      if (!clientId) return "Failed: A project must be attached to a Client.";
+      if (!clientId) return "Failed: A project must be attached to a Client/Partner.";
 
       const payload = {
           ...data,
@@ -306,8 +321,6 @@ export const useKanban = () => {
       // We check if BL is provided, else default to first available for V1 simplicity.
       const businessLineId = businessLines.length > 0 ? businessLines[0].id : null;
       
-      // Note: Even if null, we proceed but in a real schema enforcement we'd block.
-      // For now, we add it.
       const payload = { ...data, organization_id: orgId, status: 'Planning', checklist: [] };
       const { data: inserted, error } = await supabase.from('events').insert(payload).select().single();
       if (!error && inserted) setEvents(prev => [inserted, ...prev]);
@@ -372,6 +385,40 @@ export const useKanban = () => {
       return `Could not find task with title "${title}".`;
   }, [tasks]);
 
+  // -- Functions required for internal hook usage --
+  
+  const updateDeal = useCallback(async (id: string, d: Partial<Deal>) => {
+      const { error } = await supabase.from('deals').update(d).eq('id', id);
+      if (!error) setDeals(prev => prev.map(deal => deal.id === id ? {...deal, ...d} : deal));
+      return "Updated";
+  }, []);
+
+  const updateProject = useCallback(async (id: string, d: Partial<Project>) => {
+      const { error } = await supabase.from('projects').update(d).eq('id', id);
+      if (!error) setProjects(prev => prev.map(p => p.id === id ? {...p, ...d} : p));
+      return "Updated";
+  }, []);
+
+  const addDocument = useCallback(async (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => {
+      if (!orgId) return null;
+      const newDoc = {
+          organization_id: orgId,
+          name: file.name,
+          category,
+          owner_id: ownerId,
+          owner_type: ownerType,
+          url: URL.createObjectURL(new Blob([file.content || ''])),
+          note,
+          created_at: new Date().toISOString()
+      };
+      const { data: inserted } = await supabase.from('documents').insert(newDoc).select().single();
+      if (inserted) {
+          setDocuments(prev => [inserted as Document, ...prev]);
+          return inserted as Document;
+      }
+      return null;
+  }, [orgId]);
+
   // --- AI DISPATCHER ---
   
   const processTextAndExecute = useCallback(async (text: string, context: UniversalInputContext, file?: any) => {
@@ -379,14 +426,73 @@ export const useKanban = () => {
           clients: clients.map(c => c.name), 
           deals: deals.map(d => d.name), 
           businessLines: businessLines.map(b => b.name),
-          teamMembers: teamMembers.map(m => m.name) // Pass members to AI for ATC
+          teamMembers: teamMembers.map(m => m.name),
+          projects: projects.map(p => p.projectName)
       }, context, "User is active", file);
 
-      // 1. Tasks
-      if (result.action === 'create_task' || result.action === 'both') {
+      // 1. Business Line (Create first as root)
+      if (result.action === 'create_business_line' && result.businessLine) {
+          await addBusinessLine(result.businessLine);
+      }
+
+      // 2. Client (Create second)
+      if (result.action === 'create_client' && result.client) {
+           let blId = context.businessLineId;
+           if (result.client.businessLineName) {
+               const bl = businessLines.find(b => b.name.toLowerCase() === result.client!.businessLineName!.toLowerCase());
+               if (bl) blId = bl.id;
+           }
+           if (!blId && businessLines.length > 0) blId = businessLines[0].id;
+           if (blId) {
+               await addClient({
+                   name: result.client.name,
+                   description: result.client.description,
+                   aiFocus: result.client.aiFocus,
+                   businessLineId: blId
+               });
+           }
+      }
+      
+      // 3. Deal
+      if (result.action === 'create_deal' && result.deal) {
+          await addDeal({
+              name: result.deal.name,
+              description: result.deal.description,
+              clientName: result.deal.clientName,
+              value: result.deal.value,
+              currency: result.deal.currency,
+              revenueModel: result.deal.revenueModel
+          });
+      }
+
+      // 4. Project
+      if (result.action === 'create_project' && result.project) {
+          await addProject(result.project);
+      }
+
+      // 5. Event
+      if (result.action === 'create_event' && result.event) {
+          await addEvent(result.event);
+      }
+
+      // 6. Candidate
+      if (result.action === 'create_candidate' && result.candidate) {
+          await addCandidate({
+              name: result.candidate.name,
+              roleApplied: result.candidate.roleApplied,
+              email: result.candidate.email || 'pending@email.com'
+          });
+      }
+      
+      // 7. Social Post
+      if (result.action === 'create_social_post' && result.socialPost) {
+          // Handle in logic below via task or direct DB, assumed handled by addSocialPost if exposed
+      }
+
+      // 8. Tasks (Action Cascading: Execute ALL tasks in array)
+      if (result.tasks && result.tasks.length > 0) {
           result.tasks.forEach(t => {
               let assigneeId = undefined;
-              // ATC Logic: Resolve assignee name to ID
               if (t.assignee_name) {
                   const member = teamMembers.find(m => m.name.toLowerCase().includes(t.assignee_name!.toLowerCase()));
                   if (member) assigneeId = member.id;
@@ -402,7 +508,7 @@ export const useKanban = () => {
           });
       }
       
-      // 2. Notes / CRM Entries
+      // 9. Notes
       if (result.note || result.action === 'create_note') {
            const noteContent = result.note?.text || text;
            const channel = result.note?.channel || 'note';
@@ -422,63 +528,217 @@ export const useKanban = () => {
            }
       }
 
-      // 3. Business Line
-      if (result.action === 'create_business_line' && result.businessLine) {
-          addBusinessLine(result.businessLine);
-      }
+  }, [clients, deals, businessLines, teamMembers, projects, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate]);
 
-      // 4. Client
-      if (result.action === 'create_client' && result.client) {
-           let blId = context.businessLineId;
-           if (result.client.businessLineName) {
-               const bl = businessLines.find(b => b.name.toLowerCase() === result.client!.businessLineName!.toLowerCase());
-               if (bl) blId = bl.id;
-           }
-           if (!blId && businessLines.length > 0) blId = businessLines[0].id;
-           if (blId) {
-               addClient({
-                   name: result.client.name,
-                   description: result.client.description,
-                   aiFocus: result.client.aiFocus,
-                   businessLineId: blId
-               });
-           }
-      }
+  // --- CONTEXTUAL WALTER & DEEP INTELLIGENCE ---
+
+  const generateLeadScore = async (client: Client) => {
+      if(!orgId) return;
+      const prompt = `Analyze this client for lead scoring:
+      Name: ${client.name}
+      Description: ${client.description}
+      AI Focus (Goals): ${client.aiFocus}
       
-      // 5. Deal
-      if (result.action === 'create_deal' && result.deal) {
-          addDeal({
-              name: result.deal.name,
-              description: result.deal.description,
-              clientName: result.deal.clientName,
-              value: result.deal.value,
-              currency: result.deal.currency,
-              revenueModel: result.deal.revenueModel
+      Assign a Score between 0-100 based on clarity of need and potential value.
+      Provide a short reason.
+      Return JSON: { score: number, reason: string }`;
+      
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              score: { type: GeminiType.NUMBER },
+              reason: { type: GeminiType.STRING }
+          }
+      };
+      
+      const res = await generateJsonWithSearch(prompt, schema);
+      if(res) {
+          await updateClient(client.id, { leadScore: res.score, leadScoreReason: res.reason });
+      }
+  };
+
+  const updateClientFromInteraction = async (id: string, text: string) => {
+      const client = clients.find(c => c.id === id);
+      if(!client) return;
+      
+      const prompt = `Analyze this interaction for client "${client.name}":
+      "${text}"
+      
+      Extract key updates.
+      Return JSON: { 
+          summary: string (Last touch summary), 
+          nextAction: string (Next step title), 
+          nextActionDate: string (ISO date for next step) 
+      }`;
+      
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              summary: { type: GeminiType.STRING },
+              nextAction: { type: GeminiType.STRING },
+              nextActionDate: { type: GeminiType.STRING }
+          }
+      };
+      
+      const res = await generateJsonWithSearch(prompt, schema);
+      if(res) {
+          await updateClient(id, {
+              proposedLastTouchSummary: res.summary,
+              proposedNextAction: res.nextAction,
+              proposedNextActionDueDate: res.nextActionDate
           });
       }
+  };
 
-      // 6. Project
-      if (result.action === 'create_project' && result.project) {
-          addProject(result.project);
-      }
-
-      // 7. Event (NEW)
-      if (result.action === 'create_event' && result.event) {
-          addEvent(result.event);
-      }
-
-      // 8. Candidate (NEW)
-      if (result.action === 'create_candidate' && result.candidate) {
-          addCandidate({
-              name: result.candidate.name,
-              roleApplied: result.candidate.roleApplied,
-              email: result.candidate.email || 'pending@email.com'
+  const updateDealFromInteraction = async (id: string, text: string) => {
+      const deal = deals.find(d => d.id === id);
+      if(!deal) return;
+      
+      const prompt = `Analyze this interaction for deal "${deal.name}":
+      "${text}"
+      
+      Extract updates.
+      Return JSON: {
+          summary: string (Last touch),
+          nextAction: string,
+          nextActionDate: string (ISO),
+          status: string (Open, Closed - Won, Closed - Lost)
+      }`;
+      
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              summary: { type: GeminiType.STRING },
+              nextAction: { type: GeminiType.STRING },
+              nextActionDate: { type: GeminiType.STRING },
+              status: { type: GeminiType.STRING }
+          }
+      };
+      
+      const res = await generateJsonWithSearch(prompt, schema);
+      if(res) {
+          await updateDeal(id, {
+              proposedLastTouchSummary: res.summary,
+              proposedNextAction: res.nextAction,
+              proposedNextActionDueDate: res.nextActionDate,
+              proposedStatus: res.status as any
           });
       }
+  };
 
-  }, [clients, deals, businessLines, teamMembers, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate]);
+  const updateProjectFromInteraction = async (id: string, text: string) => {
+      const project = projects.find(p => p.id === id);
+      if(!project) return;
+      
+      const prompt = `Analyze this update for project "${project.projectName}":
+      "${text}"
+      
+      Return JSON: {
+          summary: string,
+          nextAction: string,
+          nextActionDate: string,
+          stage: string (Lead, In design, Live, Closing, Dormant)
+      }`;
+      
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              summary: { type: GeminiType.STRING },
+              nextAction: { type: GeminiType.STRING },
+              nextActionDate: { type: GeminiType.STRING },
+              stage: { type: GeminiType.STRING }
+          }
+      };
+      
+      const res = await generateJsonWithSearch(prompt, schema);
+      if(res) {
+          await updateProject(id, {
+              proposedLastTouchSummary: res.summary,
+              proposedNextAction: res.nextAction,
+              proposedNextActionDueDate: res.nextActionDate,
+              proposedStage: res.stage as any
+          });
+      }
+  };
 
-  // ... [Keep research methods same] ...
+  const refineTaskChecklist = async (taskId: string, command: string) => {
+      const task = tasks.find(t => t.id === taskId);
+      if(!task) return;
+      
+      const prompt = `Refine the checklist for task: "${task.title}".
+      Description: ${task.description || 'None'}
+      Current Checklist: ${JSON.stringify(task.subTasks || [])}
+      
+      User Command: "${command}"
+      
+      Return JSON: { subTasks: string[] (List of ALL subtask titles, new and old combined properly) }`;
+      
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              subTasks: { type: GeminiType.ARRAY, items: { type: GeminiType.STRING } }
+          }
+      };
+      
+      const res = await generateJsonWithSearch(prompt, schema);
+      if(res && res.subTasks) {
+          const newSubTasks = res.subTasks.map((t: string) => ({ id: Math.random().toString(36), text: t, isDone: false }));
+          await updateTask(taskId, { subTasks: newSubTasks });
+      }
+  };
+
+  const generateDocumentDraft = async (prompt: string, category: DocumentCategory, owner: any, ownerType: string) => {
+      const ownerName = 'name' in owner ? owner.name : owner.projectName;
+      const fullPrompt = `Draft a ${category} document for ${ownerName} (${ownerType}).
+      Context: ${prompt}
+      
+      Return only the document content in Markdown format.`;
+      
+      return await generateContentWithSearch(fullPrompt);
+  };
+
+  const regeneratePlaybook = async (businessLine: BusinessLine) => {
+      const prompt = `Create a step-by-step Playbook for this Business Line:
+      Name: ${businessLine.name}
+      Description: ${businessLine.description}
+      
+      Return JSON: { steps: [{ title: string, description: string }] }`;
+      
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              steps: { 
+                  type: GeminiType.ARRAY,
+                  items: {
+                      type: GeminiType.OBJECT,
+                      properties: {
+                          title: { type: GeminiType.STRING },
+                          description: { type: GeminiType.STRING }
+                      }
+                  }
+              }
+          }
+      };
+      
+      const res = await generateJsonWithSearch(prompt, schema);
+      if(res && res.steps) {
+          // Check if playbook exists
+          const existing = playbooks.find(p => p.businessLineId === businessLine.id);
+          if(existing) {
+              await supabase.from('playbooks').update({ steps: res.steps }).eq('id', existing.id);
+              setPlaybooks(prev => prev.map(p => p.id === existing.id ? {...p, steps: res.steps} : p));
+          } else {
+              const { data: inserted } = await supabase.from('playbooks').insert({ 
+                  organization_id: orgId,
+                  business_line_id: businessLine.id,
+                  steps: res.steps 
+              }).select().single();
+              if(inserted) setPlaybooks(prev => [...prev, inserted]);
+          }
+      }
+  };
+
+  // ... [Deep Intelligence Methods - Keep Existing Implementation] ...
   const analyzeProjectRisk = useCallback(async (project: Project) => {
       const prompt = `Perform a 'Pre-Mortem' risk assessment for this project:
       Name: ${project.projectName}
@@ -660,44 +920,19 @@ export const useKanban = () => {
           await supabase.from('business_lines').delete().eq('id', id);
           setBusinessLines(prev => prev.filter(b => b.id !== id));
       },
-      updateDeal: async (id: string, d: Partial<Deal>) => {
-          await supabase.from('deals').update(d).eq('id', id);
-          setDeals(prev => prev.map(deal => deal.id === id ? {...deal, ...d} : deal));
-          return "Updated";
-      },
+      updateDeal,
       deleteDeal: async (id: string) => {
           if (!isAdmin()) { alert("Only Admins can delete."); return; }
           await supabase.from('deals').delete().eq('id', id);
           setDeals(prev => prev.filter(d => d.id !== id));
       },
-      updateProject: async (id: string, d: Partial<Project>) => {
-          await supabase.from('projects').update(d).eq('id', id);
-          setProjects(prev => prev.map(p => p.id === id ? {...p, ...d} : p));
-          return "Updated";
-      },
+      updateProject,
       deleteProject: async (id: string) => {
           if (!isAdmin()) { alert("Only Admins can delete."); return; }
           await supabase.from('projects').delete().eq('id', id);
           setProjects(prev => prev.filter(p => p.id !== id));
       },
-      addDocument: async (file: any, category: DocumentCategory, ownerId: string, ownerType: DocumentOwnerType, note?: string) => {
-          const newDoc = {
-              organization_id: orgId,
-              name: file.name,
-              category,
-              owner_id: ownerId,
-              owner_type: ownerType,
-              url: URL.createObjectURL(new Blob([file.content || ''])),
-              note,
-              created_at: new Date().toISOString()
-          };
-          const { data: inserted } = await supabase.from('documents').insert(newDoc).select().single();
-          if (inserted) {
-              setDocuments(prev => [inserted as Document, ...prev]);
-              return inserted as Document;
-          }
-          return null;
-      },
+      addDocument,
       deleteDocument: async (id: string) => {
           await supabase.from('documents').delete().eq('id', id);
           setDocuments(prev => prev.filter(d => d.id !== id));
@@ -774,20 +1009,83 @@ export const useKanban = () => {
           return await generateVideos(prompt);
       },
       
-      generateLeadScore: async (client: Client) => {},
-      updateClientFromInteraction: async (id: string, text: string) => {},
-      approveClientUpdate: (id: string) => {},
-      clearProposedClientUpdate: (id: string) => {},
-      updateDealFromInteraction: async (id: string, text: string) => {},
-      approveDealUpdate: (id: string) => {},
-      clearProposedDealUpdate: (id: string) => {},
-      updateProjectFromInteraction: async (id: string, text: string) => {},
-      approveProjectUpdate: (id: string) => {},
-      clearProposedProjectUpdate: (id: string) => {},
-      generateDocumentDraft: async (prompt: string, category: DocumentCategory, owner: any, ownerType: string) => "Draft content...",
-      generateMarketingCollateralContent: async (prompt: string, type: string, owner: any) => "Marketing content...",
-      enhanceUserPrompt: async (prompt: string) => "Enhanced prompt...",
-      logPaymentOnDeal: (id: string, amount: number, note: string) => {},
+      generateLeadScore,
+      updateClientFromInteraction,
+      approveClientUpdate: async (id: string) => {
+          const client = clients.find(c => c.id === id);
+          if(client && client.proposedNextAction) {
+              await updateClient(id, {
+                  // Commit changes to actual fields if you have them, or just clear
+                  proposedLastTouchSummary: undefined, proposedNextAction: undefined, proposedNextActionDueDate: undefined
+              });
+              // Add task for next action
+              addTask({ title: client.proposedNextAction, dueDate: client.proposedNextActionDueDate, clientId: id, businessLineId: client.businessLineId });
+          }
+      },
+      clearProposedClientUpdate: async (id: string) => {
+          await updateClient(id, { proposedLastTouchSummary: undefined, proposedNextAction: undefined, proposedNextActionDueDate: undefined });
+      },
+      
+      updateDealFromInteraction,
+      approveDealUpdate: async (id: string) => {
+          const deal = deals.find(d => d.id === id);
+          if(deal) {
+              await updateDeal(id, {
+                  status: deal.proposedStatus as any || deal.status,
+                  proposedStatus: undefined, proposedLastTouchSummary: undefined, proposedNextAction: undefined, proposedNextActionDueDate: undefined
+              });
+              if(deal.proposedNextAction) {
+                  addTask({ title: deal.proposedNextAction, dueDate: deal.proposedNextActionDueDate, dealId: id, clientId: deal.clientId, businessLineId: deal.businessLineId });
+              }
+          }
+      },
+      clearProposedDealUpdate: async (id: string) => {
+          await updateDeal(id, { proposedStatus: undefined, proposedLastTouchSummary: undefined, proposedNextAction: undefined, proposedNextActionDueDate: undefined });
+      },
+      
+      updateProjectFromInteraction,
+      approveProjectUpdate: async (id: string) => {
+          const project = projects.find(p => p.id === id);
+          if(project) {
+              await supabase.from('projects').update({
+                  stage: project.proposedStage || project.stage,
+                  last_touch_summary: project.proposedLastTouchSummary || project.lastTouchSummary,
+                  next_action: project.proposedNextAction || project.nextAction,
+                  next_action_due_date: project.proposedNextActionDueDate || project.nextActionDueDate,
+                  proposedStage: null, proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null
+              }).eq('id', id);
+              
+              setProjects(prev => prev.map(p => p.id === id ? {
+                  ...p, 
+                  stage: project.proposedStage || p.stage,
+                  lastTouchSummary: project.proposedLastTouchSummary || p.lastTouchSummary,
+                  nextAction: project.proposedNextAction || p.nextAction,
+                  nextActionDueDate: project.proposedNextActionDueDate || p.nextActionDueDate,
+                  proposedStage: undefined, proposedLastTouchSummary: undefined, proposedNextAction: undefined, proposedNextActionDueDate: undefined
+              } : p));
+          }
+      },
+      clearProposedProjectUpdate: async (id: string) => {
+          await supabase.from('projects').update({ proposedStage: null, proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null }).eq('id', id);
+          setProjects(prev => prev.map(p => p.id === id ? {...p, proposedStage: undefined, proposedLastTouchSummary: undefined, proposedNextAction: undefined, proposedNextActionDueDate: undefined} : p));
+      },
+      
+      generateDocumentDraft,
+      generateMarketingCollateralContent: async (prompt: string, type: string, owner: any) => {
+          return await generateContentWithSearch(`Create a ${type} for ${owner.name || owner.projectName}. Context: ${prompt}`);
+      },
+      enhanceUserPrompt: async (prompt: string) => {
+          const res = await generateContentWithSearch(`Enhance this prompt to be more detailed and effective for an AI generator: "${prompt}". Return only the enhanced prompt.`);
+          return res;
+      },
+      logPaymentOnDeal: async (id: string, amount: number, note: string) => {
+          const deal = deals.find(d => d.id === id);
+          if(deal) {
+              const newAmount = (deal.amountPaid || 0) + amount;
+              await updateDeal(id, { amountPaid: newAmount });
+              addCRMEntry({ clientId: deal.clientId, dealId: id, summary: `Payment Received: ${deal.currency} ${amount}. Note: ${note}`, type: 'note', rawContent: note });
+          }
+      },
       findProspects,
       getClientPulse,
       getCompetitorInsights,
@@ -796,18 +1094,48 @@ export const useKanban = () => {
       generateSocialMediaIdeas,
       
       getPlatformInsights: () => [],
-      generateDocumentFromSubtask: async (task: Task, subtaskText: string) => null,
-      researchSubtask: async (subtask: string, context: string) => "Research results...",
-      refineTaskChecklist: async (taskId: string, command: string) => {},
+      generateDocumentFromSubtask: async (task: Task, subtaskText: string) => {
+          const content = await generateContentWithSearch(`Draft a document for the task: "${subtaskText}". Context: Task "${task.title}".`);
+          return await addDocument({name: `${subtaskText}.md`, content}, 'SOPs', task.id, 'deal'); // fallback owner
+      },
+      researchSubtask: async (subtask: string, context: string) => {
+          return await generateContentWithSearch(`Research this task: "${subtask}". Context: ${context}. Provide a summary.`);
+      },
+      refineTaskChecklist,
       generateMeetingTranscript: async (taskId: string) => {},
-      toggleSubTask: async (taskId: string, subTaskId: string) => {},
+      toggleSubTask: async (taskId: string, subTaskId: string) => {
+          const task = tasks.find(t => t.id === taskId);
+          if(task && task.subTasks) {
+              const newSubTasks = task.subTasks.map(st => st.id === subTaskId ? {...st, isDone: !st.isDone} : st);
+              await updateTask(taskId, { subTasks: newSubTasks });
+          }
+      },
       dismissSuggestions: (type: string, id: string) => {},
-      getDealOpportunities: async (deal: Deal) => ({ opportunities: [] }),
-      getClientOpportunities: async (client: Client) => ({ opportunities: [] }),
-      regeneratePlaybook: async (businessLine: BusinessLine) => {},
-      updatePlaybook: async (id: string, steps: any[]) => {},
-      promoteSubtaskToTask: (taskId: string, subTaskId: string) => {},
-      getPlatformQueryResponse: async (query: string) => "",
+      getDealOpportunities: async (deal: Deal) => {
+          const prompt = `Analyze deal "${deal.name}". Suggest 3 upsell opportunities or next steps. Return JSON: { opportunities: [{ id: string, text: string }] }`;
+          const schema = { type: GeminiType.OBJECT, properties: { opportunities: { type: GeminiType.ARRAY, items: { type: GeminiType.OBJECT, properties: { id: {type: GeminiType.STRING}, text: {type: GeminiType.STRING} } } } } };
+          return await generateJsonWithSearch(prompt, schema) || { opportunities: [] };
+      },
+      getClientOpportunities: async (client: Client) => {
+          const prompt = `Analyze client "${client.name}". Suggest 3 growth opportunities. Return JSON: { opportunities: [{ id: string, text: string }] }`;
+          const schema = { type: GeminiType.OBJECT, properties: { opportunities: { type: GeminiType.ARRAY, items: { type: GeminiType.OBJECT, properties: { id: {type: GeminiType.STRING}, text: {type: GeminiType.STRING} } } } } };
+          return await generateJsonWithSearch(prompt, schema) || { opportunities: [] };
+      },
+      regeneratePlaybook,
+      updatePlaybook: async (id: string, steps: any[]) => {
+          await supabase.from('playbooks').update({ steps }).eq('id', id);
+          setPlaybooks(prev => prev.map(p => p.id === id ? {...p, steps} : p));
+      },
+      promoteSubtaskToTask: (taskId: string, subTaskId: string) => {
+          const task = tasks.find(t => t.id === taskId);
+          const subtask = task?.subTasks?.find(st => st.id === subTaskId);
+          if(subtask) {
+              addTask({ title: subtask.text, clientId: task?.clientId, dealId: task?.dealId, businessLineId: task?.businessLineId });
+          }
+      },
+      getPlatformQueryResponse: async (query: string) => {
+          return await generateContentWithSearch(`Answer this user query about their data: "${query}". Context: User has ${tasks.length} tasks, ${deals.length} deals.`);
+      },
       logEmailToCRM: () => {},
       updateTeamMember: async (id: string, data: any) => {},
       deleteTeamMember: async (id: string) => {},

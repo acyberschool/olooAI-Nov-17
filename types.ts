@@ -333,7 +333,7 @@ export interface RouterNote {
 }
 
 export interface RouterBrainResult {
-  action: 'create_task' | 'create_note' | 'both' | 'update_task' | 'ignore' | 'create_business_line' | 'create_client' | 'create_deal' | 'create_project' | 'create_event' | 'create_candidate';
+  action: 'create_task' | 'create_note' | 'both' | 'update_task' | 'ignore' | 'create_business_line' | 'create_client' | 'create_deal' | 'create_project' | 'create_event' | 'create_candidate' | 'create_social_post';
   tasks: RouterTask[];
   note: RouterNote | null;
   summary: string | null;
@@ -358,6 +358,12 @@ export interface RouterBrainResult {
       name: string;
       roleApplied: string;
       email: string;
+  };
+  socialPost?: {
+      content: string;
+      channel: string;
+      visualPrompt?: string;
+      date?: string;
   };
 }
 
