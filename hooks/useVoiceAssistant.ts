@@ -1,7 +1,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { connectToLiveSession, decode, decodeAudioData, createPcmBlob } from '../services/geminiService';
-import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType, Project } from '../types';
+import { KanbanStatus, Task, Client, BusinessLine, Deal, CRMEntryType, Project, Event, HRCandidate } from '../types';
 
 type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
@@ -13,10 +13,17 @@ interface UseVoiceAssistantProps {
   onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => Promise<string> | string;
   onDealCreate: (data: Omit<Deal, 'id' | 'status' | 'amountPaid' | 'clientId' | 'businessLineId'> & {clientName: string; clientId?: string; businessLineId?: string;}) => Promise<string> | string;
   onProjectCreate?: (data: Partial<Omit<Project, 'id'>> & { partnerName: string; projectName: string; goal: string; }) => Promise<string> | string;
+  onEventCreate?: (data: Partial<Event>) => Promise<string> | string;
+  onCandidateCreate?: (data: Partial<HRCandidate>) => Promise<string> | string;
   onDealStatusUpdate: (dealId: string, newStatus: 'Open' | 'Closed - Won' | 'Closed - Lost') => Promise<string> | string;
   onTurnComplete?: (userTranscript: string, assistantTranscript: string) => void;
   onFindProspects?: (data: { businessLineName: string }) => Promise<string>;
   onPlatformQuery?: (query: string) => Promise<string>;
+  // Deep Intelligence Hooks
+  onAnalyzeRisk?: (data: { projectName: string }) => Promise<string>;
+  onAnalyzeNegotiation?: (data: { dealName: string }) => Promise<string>;
+  onGetClientPulse?: (data: { clientName: string }) => Promise<string>;
+  
   currentBusinessLineId?: string | null;
   currentClientId?: string | null;
   currentDealId?: string | null;
@@ -31,10 +38,15 @@ export const useVoiceAssistant = ({
   onClientCreate, 
   onDealCreate,
   onProjectCreate,
+  onEventCreate,
+  onCandidateCreate,
   onDealStatusUpdate,
   onTurnComplete,
   onFindProspects,
   onPlatformQuery,
+  onAnalyzeRisk,
+  onAnalyzeNegotiation,
+  onGetClientPulse,
   currentBusinessLineId,
   currentClientId,
   currentDealId,
@@ -111,68 +123,28 @@ export const useVoiceAssistant = ({
         let result: string | Promise<string> = "An unknown error occurred.";
         let finalArgs = { ...fc.args };
 
-        if (currentDealId) {
-            if (['createBoardItem', 'createCrmEntry'].includes(fc.name)) {
-                finalArgs.dealId = currentDealId;
-            }
-        } else if (currentClientId) {
-            if (['createBoardItem', 'createDeal', 'createProject', 'createCrmEntry'].includes(fc.name)) {
-                finalArgs.clientId = currentClientId;
-            }
-        } else if (currentBusinessLineId) {
-            if (['createBoardItem', 'createClient', 'createDeal', 'createProject', 'createCrmEntry', 'findProspects'].includes(fc.name)) {
-                finalArgs.businessLineId = currentBusinessLineId;
-            }
-        }
+        // Context Injection logic (Simplified)
+        if (currentDealId && ['createBoardItem', 'createCrmEntry'].includes(fc.name)) finalArgs.dealId = currentDealId;
         
         switch (fc.name) {
-            case 'createCrmEntry':
-                result = onCrmEntryCreate(finalArgs as any);
-                break;
-            case 'createBoardItem':
-                result = onBoardItemCreate(finalArgs);
-                break;
-            case 'moveTask':
-                result = onTaskUpdate(finalArgs.taskTitle as string, finalArgs.newStatus as KanbanStatus);
-                break;
-            case 'createBusinessLine':
-                result = onBusinessLineCreate(finalArgs as any);
-                break;
-            case 'createClient':
-                result = onClientCreate(finalArgs as any);
-                break;
-            case 'createDeal':
-                result = onDealCreate(finalArgs as any);
-                break;
-            case 'createProject':
-                if (onProjectCreate) {
-                    result = onProjectCreate(finalArgs);
-                }
-                break;
-            case 'updateDealStatus':
-                if (currentDealId) {
-                    result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as any);
-                } else {
-                    result = "I can only change the status of a deal you are currently viewing.";
-                }
-                break;
-            case 'findProspects':
-                if (onFindProspects) {
-                    result = onFindProspects(finalArgs as any);
-                }
-                break;
-            case 'queryPlatform':
-                if (onPlatformQuery) {
-                    result = onPlatformQuery(finalArgs.query as string);
-                }
-                break;
-            case 'sendEmail':
-                const subject = encodeURIComponent(finalArgs.subject as string);
-                const body = encodeURIComponent(finalArgs.body as string);
-                const recipient = finalArgs.recipientEmail ? `mailto:${finalArgs.recipientEmail}` : `mailto:`;
-                window.location.href = `${recipient}?subject=${subject}&body=${body}`;
-                result = "Opening email client with draft...";
-                break;
+            case 'createCrmEntry': result = onCrmEntryCreate(finalArgs as any); break;
+            case 'createBoardItem': result = onBoardItemCreate(finalArgs); break;
+            case 'moveTask': result = onTaskUpdate(finalArgs.taskTitle as string, finalArgs.newStatus as KanbanStatus); break;
+            case 'createBusinessLine': result = onBusinessLineCreate(finalArgs as any); break;
+            case 'createClient': result = onClientCreate(finalArgs as any); break;
+            case 'createDeal': result = onDealCreate(finalArgs as any); break;
+            case 'createProject': if(onProjectCreate) result = onProjectCreate(finalArgs); break;
+            case 'createEvent': if(onEventCreate) result = onEventCreate(finalArgs); break;
+            case 'createCandidate': if(onCandidateCreate) result = onCandidateCreate(finalArgs); break;
+            case 'updateDealStatus': if(currentDealId) result = onDealStatusUpdate(currentDealId, finalArgs.newStatus as any); else result = "View deal first."; break;
+            case 'findProspects': if(onFindProspects) result = onFindProspects(finalArgs as any); break;
+            case 'queryPlatform': if(onPlatformQuery) result = onPlatformQuery(finalArgs.query as string); break;
+            case 'sendEmail': window.location.href = `mailto:${finalArgs.recipientEmail}?subject=${encodeURIComponent(finalArgs.subject)}&body=${encodeURIComponent(finalArgs.body)}`; result = "Opening email..."; break;
+            
+            // New Deep Intelligence Hooks
+            case 'analyzeRisk': if(onAnalyzeRisk) result = onAnalyzeRisk(finalArgs as any); else result = "Risk analysis not available here."; break;
+            case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available here."; break;
+            case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available here."; break;
         }
 
         const finalResult = await Promise.resolve(result);
@@ -235,23 +207,20 @@ export const useVoiceAssistant = ({
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         nextStartTimeRef.current = 0;
         
-        const context = { currentBusinessLineId, currentClientId, currentDealId };
-        
-        const systemInstruction = `You are Walter, the AI engine of olooAI. You are an ACTION-FIRST system, not a chatty assistant.
-
-**PRIME DIRECTIVES:**
-1. **EXECUTE INSTANTLY:** If the user gives a command, call the tool IMMEDIATELY. Do not say "Sure" or "Okay". Just run the function.
-2. **ZERO CLARIFICATION:** Never ask "Which client?" or "What date?". INFER IT. If the user says "Call John", search for "John" in the database or pick a likely candidate. If unknown, guess "John Doe" or a placeholder. SPEED IS PRIORITY.
-3. **AGGRESSIVE ASSUMPTIONS:**
-   - If date is missing, assume "Tomorrow at 9am".
-   - If client is missing, assume the most recent client viewed (${JSON.stringify(context)}) or the user's own name.
-   - If deal value is missing, assume 0 or infer from context.
-4. **TASK CASCADING:** If the user says "Onboard new client", create the client, AND create 3 tasks: "Send Contract", "Setup Portal", "Welcome Email". Auto-chain actions.
-5. **BRIEF OUTPUT:** Confirm actions with 2-3 words max. "Done." "Task Created." "Scheduled."
-
-**Context:**
-- Current View: ${JSON.stringify(context)}
-- Recent Activity: ${platformActivitySummary || 'None.'}
+        // Aggressive System Prompt with Deep Reasoning
+        const systemInstruction = `You are Walter, the Autonomous Operating System.
+**PRIME DIRECTIVE:** ACTION & DEEP REASONING.
+1. **EXECUTE INSTANTLY:** Call functions immediately. No "Sure" or "I can help".
+2. **DEEP DIVES:** 
+   - If user asks about "Risk" -> call \`analyzeRisk\`.
+   - If user asks about "Negotiation" -> call \`analyzeNegotiation\`.
+   - If user asks "What's happening with Client X?" -> call \`getClientPulse\`.
+3. **INFER DETAILS:** 
+   - Missing Date? -> "Tomorrow 9am".
+   - Hiring? -> Infer role, create Candidate.
+   - Event? -> Infer type, create Event.
+4. **CASCADE ACTIONS:**
+   - "New Deal" -> Create Deal AND 3 follow-up tasks.
 `;
 
         const connect = () => {

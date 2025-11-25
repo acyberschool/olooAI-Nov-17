@@ -1,6 +1,7 @@
+
 # olooAI End-to-End Test Plan
 
-**Version:** 2.1
+**Version:** 2.2
 **Objective:** Verify full functionality of the "Service-as-a-Software" architecture, focusing on AI delegation (DTW), Collaboration (ATC), and Module Logic.
 
 ---
@@ -50,9 +51,23 @@
 
 ---
 
-## 3. Collaboration (ATC - Assign to Colleague)
+## 3. Deep Intelligence (Reasoning)
 
-### 3.1 The "@" Mention
+### 3.1 Risk Radar (Projects)
+*   [ ] **Action:** Go to **Projects**. Open a project.
+*   [ ] **Action:** Click **Risk Radar** button OR say "Analyze the risk for this project".
+*   [ ] **Verify:** A document appears in the Documents tab containing a risk analysis report.
+
+### 3.2 Negotiation Coach (Deals)
+*   [ ] **Action:** Go to **Deals**. Open a deal.
+*   [ ] **Action:** Click **Negotiation Coach** button.
+*   [ ] **Verify:** A strategy document is generated.
+
+---
+
+## 4. Collaboration (ATC - Assign to Colleague)
+
+### 4.1 The "@" Mention
 *   [ ] **Prerequisite:** Ensure `colleague@test.com` (let's call him "Steve") is in the workspace.
 *   [ ] **Action:** Open Universal Input. Type: *"Create a task to 'Review Legal Docs' and assign to @Steve."*
 *   [ ] **Verify:**
@@ -61,22 +76,22 @@
 
 ---
 
-## 4. Deep Modules
+## 5. Deep Modules
 
-### 4.1 Sales Pipeline
+### 5.1 Sales Pipeline
 *   [ ] **Action:** Open **Sales** tab.
 *   [ ] **Action:** Click "AI Coach" (DTW Button).
 *   [ ] **Verify:** A generic advice summary or specific tasks related to unblocking deals appear.
 *   [ ] **Action:** Drag a deal from "Qualified" to "Negotiated" in the Revenue Board.
 *   [ ] **Verify:** Deal status updates across the system.
 
-### 4.2 Events Command Center
+### 5.2 Events Command Center
 *   [ ] **Action:** Open **Events** tab.
 *   [ ] **Action:** Click "Auto-Plan Event". Input: "Q4 Marketing Summit".
 *   [ ] **Verify:** Event "Q4 Marketing Summit" is created.
 *   [ ] **Verify:** Checklist items (e.g., "Book Venue", "Select Speakers") are automatically generated inside the event card.
 
-### 4.3 HR Engine
+### 5.3 HR Engine
 *   [ ] **Action:** Open **HR** tab.
 *   [ ] **Action:** Click "Draft Job Description".
 *   [ ] **Verify:** A document draft appears or a task "Review JD" is created with the content in the description.
@@ -85,7 +100,7 @@
 
 ---
 
-## 5. Settings & Integrations
+## 6. Settings & Integrations
 *   [ ] **Action:** Open **Settings**.
 *   [ ] **Action:** Click "Connect" on Email.
 *   [ ] **Verify:** A virtual email address is generated (e.g., `walter.xyz@oloo.ai`).

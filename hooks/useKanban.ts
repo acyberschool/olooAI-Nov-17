@@ -3,7 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Task, KanbanStatus, TaskType, BusinessLine, Client, Deal, Document, DocumentCategory, Opportunity, DocumentOwnerType, Playbook, PlaybookStep, CRMEntry, CRMEntryType, Suggestion, Prospect, ClientPulse, CompetitorInsight, SearchTrend, FilterOptions, GeminiType, PlatformInsight, Project, TeamMember, Contact, Role, UniversalInputContext, SocialPost, GeminiModality, ProjectStage, ProjectDealType, Organization, Event, HRCandidate, HREmployee } from '../types';
 import { getAiInstance } from '../config/geminiConfig';
 import { processTextMessage } from '../services/routerBrainService';
-import { generateContentWithSearch, generateVideos } from '../services/geminiService';
+import { generateContentWithSearch, generateVideos, generateJsonWithSearch } from '../services/geminiService';
 import { trackEvent } from '../App';
 import { supabase } from '../supabaseClient';
 
@@ -434,9 +434,162 @@ export const useKanban = () => {
 
   }, [clients, deals, businessLines, teamMembers, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate]);
 
+  // --- DEEP INTELLIGENCE & RESEARCH ---
+
   const findProspectsByName = useCallback(async ({ businessLineName }: { businessLineName: string }) => {
-      return "Feature placeholder: Found prospects logic would run here.";
+      const bl = businessLines.find(b => b.name.toLowerCase() === businessLineName.toLowerCase());
+      if (!bl) return "Business line not found.";
+      
+      const { prospects } = await findProspects(bl, "Find 3 high-value prospects.");
+      if (prospects.length > 0) {
+          return `Found ${prospects.length} prospects: ${prospects.map(p => p.name).join(", ")}. Check the Prospects tab.`;
+      }
+      return "No prospects found this time.";
+  }, [businessLines]);
+
+  const findProspects = useCallback(async (businessLine: BusinessLine, prompt: string) => {
+        const searchPrompt = `Search for companies or individuals who match this profile:
+        Business Line: ${businessLine.name}
+        Target Customers: ${businessLine.customers}
+        Goal: ${businessLine.aiFocus}
+        
+        Specific Instruction: ${prompt}
+        
+        Return a list of potential prospects with their name and likely need.`;
+
+        const schema = {
+            type: GeminiType.OBJECT,
+            properties: {
+                prospects: {
+                    type: GeminiType.ARRAY,
+                    items: {
+                        type: GeminiType.OBJECT,
+                        properties: {
+                            name: { type: GeminiType.STRING },
+                            likelyNeed: { type: GeminiType.STRING },
+                        }
+                    }
+                }
+            }
+        };
+
+        const result = await generateJsonWithSearch(searchPrompt, schema);
+        return { prospects: result?.prospects || [], sources: [] };
   }, []);
+
+  const getClientPulse = useCallback(async (client: Client, filters: any, customPrompt?: string) => {
+      const prompt = `Find recent news, social media posts, or public activity about "${client.name}". 
+      Focus on: ${client.aiFocus}.
+      Timeframe: ${filters.timeframe}. Location: ${filters.location}.
+      ${customPrompt || ''}
+      
+      Return a list of 'pulse' items including source, content summary, url, and date.`;
+
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              items: {
+                  type: GeminiType.ARRAY,
+                  items: {
+                      type: GeminiType.OBJECT,
+                      properties: {
+                          source: { type: GeminiType.STRING, enum: ['News', 'Social Media'] },
+                          content: { type: GeminiType.STRING },
+                          url: { type: GeminiType.STRING },
+                          date: { type: GeminiType.STRING }
+                      }
+                  }
+              }
+          }
+      };
+
+      const result = await generateJsonWithSearch(prompt, schema);
+      return result?.items || [];
+  }, []);
+
+  const getCompetitorInsights = useCallback(async (businessLine: BusinessLine, filters: any, customPrompt?: string) => {
+      const prompt = `Analyze the competitive landscape for a business doing: ${businessLine.description}.
+      Location: ${filters.location}.
+      ${customPrompt || ''}
+      
+      1. Identify key competitors and a recent insight for each.
+      2. Identify trending search keywords customers use to find this service.`;
+
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              insights: {
+                  type: GeminiType.ARRAY,
+                  items: {
+                      type: GeminiType.OBJECT,
+                      properties: {
+                          competitorName: { type: GeminiType.STRING },
+                          insight: { type: GeminiType.STRING },
+                          source: { type: GeminiType.STRING }
+                      }
+                  }
+              },
+              trends: {
+                  type: GeminiType.ARRAY,
+                  items: {
+                      type: GeminiType.OBJECT,
+                      properties: {
+                          keyword: { type: GeminiType.STRING },
+                          insight: { type: GeminiType.STRING }
+                      }
+                  }
+              }
+          }
+      };
+
+      const result = await generateJsonWithSearch(prompt, schema);
+      return { insights: result?.insights || [], trends: result?.trends || [] };
+  }, []);
+
+  // New: Deep Dive for Projects (Risk Assessment)
+  const analyzeProjectRisk = useCallback(async (project: Project) => {
+      const prompt = `Perform a 'Pre-Mortem' risk assessment for this project:
+      Name: ${project.projectName}
+      Goal: ${project.goal}
+      Stage: ${project.stage}
+      
+      Search for common pitfalls in similar projects (e.g., '${project.dealType}' deals in this industry).
+      Provide a report listing top 3 Risks and Mitigation Strategies.`;
+      
+      // Return generic text report
+      return await generateContentWithSearch(prompt);
+  }, []);
+
+  // New: Deep Dive for Deals (Negotiation)
+  const analyzeDealStrategy = useCallback(async (deal: Deal, client: Client) => {
+      const prompt = `Act as a negotiation coach. Analyze this deal:
+      Deal: ${deal.name} ($${deal.value})
+      Client: ${client.name} (${client.description})
+      Status: ${deal.status}
+      
+      Search for the client's recent financial health or strategic direction if public.
+      Suggest 3 negotiation levers or value props we can use to close this deal.`;
+      
+      return await generateContentWithSearch(prompt);
+  }, []);
+
+  // New: Trend Spotting for Social Media
+  const generateSocialMediaIdeas = useCallback(async (businessLine: BusinessLine, promptInput: string) => {
+      const prompt = `Find CURRENT trending topics, hashtags, or news events relevant to: ${businessLine.name} (${businessLine.description}).
+      Then, suggest 5 engaging social media post ideas that tie these trends to our business.
+      ${promptInput}`;
+      
+      const schema = {
+          type: GeminiType.OBJECT,
+          properties: {
+              ideas: { type: GeminiType.ARRAY, items: { type: GeminiType.STRING } }
+          }
+      };
+      
+      const result = await generateJsonWithSearch(prompt, schema);
+      return result?.ideas || [];
+  }, []);
+
 
   // RETURN
   return {
@@ -552,9 +705,13 @@ export const useKanban = () => {
       generateMarketingCollateralContent: async (prompt: string, type: string, owner: any) => "Marketing content...",
       enhanceUserPrompt: async (prompt: string) => "Enhanced prompt...",
       logPaymentOnDeal: (id: string, amount: number, note: string) => {},
-      findProspects: async (businessLine: BusinessLine, prompt: string) => ({ prospects: [], sources: [] }),
-      getClientPulse: async (client: Client, filters: any, prompt?: string) => [],
-      getCompetitorInsights: async (businessLine: BusinessLine, filters: any, prompt?: string) => ({ insights: [], trends: [] }),
+      findProspects,
+      getClientPulse,
+      getCompetitorInsights,
+      analyzeProjectRisk,
+      analyzeDealStrategy,
+      generateSocialMediaIdeas,
+      
       getPlatformInsights: () => [],
       generateDocumentFromSubtask: async (task: Task, subtaskText: string) => null,
       researchSubtask: async (subtask: string, context: string) => "Research results...",
@@ -564,7 +721,6 @@ export const useKanban = () => {
       dismissSuggestions: (type: string, id: string) => {},
       getDealOpportunities: async (deal: Deal) => ({ opportunities: [] }),
       getClientOpportunities: async (client: Client) => ({ opportunities: [] }),
-      generateSocialMediaIdeas: async (businessLine: BusinessLine, prompt: string) => [],
       regeneratePlaybook: async (businessLine: BusinessLine) => {},
       updatePlaybook: async (id: string, steps: any[]) => {},
       promoteSubtaskToTask: (taskId: string, subTaskId: string) => {},

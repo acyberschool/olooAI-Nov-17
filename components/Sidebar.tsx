@@ -17,20 +17,20 @@ const NavItem: React.FC<{
   activeView: View;
   onClick: (view: View) => void;
   icon: React.ReactElement<{ className?: string }>;
-  className?: string;
-}> = ({ label, view, activeView, onClick, icon, className }) => {
+}> = ({ label, view, activeView, onClick, icon }) => {
   const isActive = activeView === view;
   return (
     <li
       onClick={() => onClick(view)}
-      className={`flex items-center p-3 rounded-full cursor-pointer transition-colors duration-200 relative ${
+      className={`flex items-center px-4 py-3 mb-1 rounded-xl cursor-pointer transition-all duration-200 group ${
         isActive
-          ? 'bg-brevo-mint-active text-brevo-text-primary'
-          : 'text-brevo-text-secondary hover:bg-gray-100'
-      } ${className || ''}`}
+          ? 'bg-[#111827] text-white shadow-md transform scale-[1.02]'
+          : 'text-gray-600 hover:bg-gray-100 hover:text-[#111827]'
+      }`}
     >
-      {React.cloneElement(icon, { className: 'h-6 w-6 flex-shrink-0'})}
-      <span className="ml-3 font-medium">{label}</span>
+      {React.cloneElement(icon, { className: `h-5 w-5 flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-[#111827]'}`})}
+      <span className="ml-3 font-medium text-sm">{label}</span>
+      {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white/50" />}
     </li>
   );
 };
@@ -45,11 +45,10 @@ const CrmIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/sv
 const SalesIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>;
 const EventsIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>;
 const HRIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>;
-const TeamIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.512 2.72a3 3 0 01-4.682-2.72 9.094 9.094 0 013.741-.479m7.512 2.72a8.97 8.97 0 01-3.741-.479m3.741.479a8.97 8.97 0 00-3.741-.479m-7.512 2.72a9.094 9.094 0 01-3.741-.479m5.408 1.903a9.094 9.094 0 01-3.741-.479M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>;
 const DataIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" /></svg>;
 const SettingsIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-1.007 1.11-1.226.55-.22 1.156-.22 1.706 0 .55.219 1.02.684 1.11 1.226l.043.25a1.58 1.58 0 001.086 1.086l.25.043c.542.09 1.007.56 1.226 1.11.22.55.22 1.156 0 1.706-.219.55-.684 1.02-1.226 1.11l-.25.043a1.58 1.58 0 00-1.086 1.086l-.043.25c-.09.542-.56 1.007-1.11 1.226-.55.22-1.156.22-1.706 0-.55-.219-1.02-.684-1.11-1.226l-.043-.25a1.58 1.58 0 00-1.086-1.086l.25-.043c-.542-.09-1.007-.56-1.226-1.11-.22-.55-.22-1.156 0-1.706.219-.55.684-1.02 1.226-1.11l.25-.043a1.58 1.58 0 001.086-1.086l.043-.25z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.875a5.125 5.125 0 100 10.25 5.125 5.125 0 000-10.25z" /></svg>;
-const SocialIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" /></svg>;
 const AccessIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>;
+const SocialIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" /></svg>;
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, setIsOpen, isSuperAdmin, permissions }) => {
   
@@ -66,47 +65,46 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             onClick={() => setIsOpen(false)}
         ></div>
 
-        <nav className={`fixed top-0 left-0 h-full w-64 bg-white p-4 border-r border-brevo-border flex flex-col z-40 transform transition-transform lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} overflow-y-auto`}>
-        <div className="mb-8 flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-brevo-cta cursor-pointer" onClick={() => { setActiveView('homepage'); setIsOpen(false); }}>olooAI</h2>
-            <button onClick={() => setIsOpen(false)} className="lg:hidden text-brevo-text-secondary">
+        <nav className={`fixed top-0 left-0 h-full w-72 bg-[#F3F4F6] p-4 border-r border-brevo-border flex flex-col z-40 transform transition-transform duration-300 lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} overflow-y-auto shadow-xl lg:shadow-none`}>
+        <div className="mb-8 flex justify-between items-center px-2">
+            <h2 className="text-2xl font-bold text-[#111827] cursor-pointer flex items-center gap-2" onClick={() => { setActiveView('homepage'); setIsOpen(false); }}>
+                <div className="w-8 h-8 bg-[#111827] rounded-lg flex items-center justify-center text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1-1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
+                </div>
+                olooAI
+            </h2>
+            <button onClick={() => setIsOpen(false)} className="lg:hidden text-gray-500 hover:bg-gray-200 p-1 rounded">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
         </div>
+        
         <ul className="space-y-1 flex-1">
             <NavItem label="Homepage" view="homepage" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<HomeIcon />} />
             
-            <div className="pt-4 pb-2">
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Core Workspace</p>
-            </div>
+            {hasAccess('crm') && <NavItem label="CRM" view="crm" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<CrmIcon />} />}
+            
+            {/* Core Workspace */}
             {hasAccess('businessLines') && <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<BusinessIcon />} />}
             {hasAccess('clients') && <NavItem label="Clients" view="clients" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<ClientsIcon />} />}
             {hasAccess('deals') && <NavItem label="Deals" view="deals" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<DealsIcon />} />}
             {hasAccess('projects') && <NavItem label="Projects" view="projects" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<ProjectsIcon />} />}
-            {hasAccess('crm') && <NavItem label="CRM" view="crm" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<CrmIcon />} />}
+            {hasAccess('businessLines') && <NavItem label="Social Media" view="social" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SocialIcon />} />}
             
-            {/* Restored Social Media to Menu */}
-            <NavItem label="Social Media" view="homepage" activeView={activeView} onClick={() => { setActiveView('homepage'); /* Pass tab logic via props in real app, simplified here to go to homepage where social tab exists */ setIsOpen(false); }} icon={<SocialIcon />} />
-
-            <div className="pt-4 pb-2">
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Advanced Modules</p>
-            </div>
+            {/* Advanced Modules */}
             {hasAccess('sales') && <NavItem label="Sales Pipeline" view="sales" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SalesIcon />} />}
-            {hasAccess('events') && <NavItem label="Event Management" view="events" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<EventsIcon />} />}
+            {hasAccess('events') && <NavItem label="Events" view="events" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<EventsIcon />} />}
             {hasAccess('hr') && <NavItem label="HR & People" view="hr" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<HRIcon />} />}
             
-            <div className="pt-4 pb-2">
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Management</p>
-            </div>
-            {hasAccess('data') && <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<DataIcon />} />}
-            {/* Added User Access Management */}
+            <div className="my-2 border-t border-gray-200 mx-4"></div>
+
             {hasAccess('settings') && <NavItem label="Members & Access" view="team" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<AccessIcon />} />}
-            {hasAccess('settings') && <NavItem label="Settings" view="settings" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />}
+            {hasAccess('data') && <NavItem label="Data & Insights" view="data" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<DataIcon />} />}
+            <NavItem label="Settings" view="settings" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />
         </ul>
         <div className="mt-auto">
             <ul className="space-y-1 pt-4 border-t border-brevo-border">
                 {isSuperAdmin && (
-                    <NavItem label="Super Admin" view="admin" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} className="text-red-700 hover:bg-red-50" />
+                    <NavItem label="Super Admin" view="admin" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />
                 )}
             </ul>
         </div>

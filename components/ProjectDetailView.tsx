@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Project, Client, BusinessLine, Task, ProjectStage, CRMEntry, Document } from '../types';
+import { Project, Client, BusinessLine, Task, ProjectStage, CRMEntry, Document, DocumentCategory } from '../types';
 import { useKanban } from '../hooks/useKanban';
 import KanbanBoard from './KanbanBoard';
 import Tabs from './Tabs';
 import ContextualWalter from './ContextualWalter';
 import DocumentManager from './DocumentManager';
 import ClientPulseView from './ClientPulseView';
+import DTWButton from './DTWButton';
 
 interface ProjectDetailViewProps {
   project: Project;
@@ -60,12 +61,22 @@ const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> 
 const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ project, client, businessLine, tasks, kanbanApi, onSelectClient, onBack, onSelectTask }) => {
     const [activeTab, setActiveTab] = useState<ProjectTab>('Work');
     const [isUpdating, setIsUpdating] = useState(false);
+    const [isAnalyzingRisk, setIsAnalyzingRisk] = useState(false);
 
     const handleUpdate = async (text: string) => {
         setIsUpdating(true);
         await kanbanApi.updateProjectFromInteraction(project.id, text);
         setIsUpdating(false);
     };
+    
+    const handleRiskAnalysis = async () => {
+        setIsAnalyzingRisk(true);
+        const report = await kanbanApi.analyzeProjectRisk(project);
+        await kanbanApi.addDocument({ name: `Risk Assessment - ${project.projectName}.md`, content: report }, 'SOPs', project.id, 'project');
+        alert("Risk Analysis complete! Check the Documents tab for the full report.");
+        setIsAnalyzingRisk(false);
+        setActiveTab('Documents');
+    }
 
     const getBusinessLineName = () => businessLine?.name || 'N/A';
 
@@ -154,8 +165,15 @@ const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ project, client, 
                             )}
                          </div>
                     </div>
-                    <div className="flex-shrink-0">
-                        <label htmlFor="projectStatus" className="text-sm text-[#6B7280] mr-2">Project Stage</label>
+                    <div className="flex-shrink-0 flex gap-2">
+                        <button 
+                            onClick={handleRiskAnalysis}
+                            disabled={isAnalyzingRisk}
+                            className="bg-red-100 hover:bg-red-200 text-red-800 px-4 py-2 rounded-lg font-bold text-sm flex items-center disabled:opacity-70"
+                        >
+                            {isAnalyzingRisk ? 'Scanning...' : '🚨 Risk Radar'}
+                        </button>
+                        <label htmlFor="projectStatus" className="text-sm text-[#6B7280] mr-2 self-center">Stage</label>
                         <select
                             id="projectStatus"
                             value={project.stage}

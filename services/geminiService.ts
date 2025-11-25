@@ -59,18 +59,58 @@ export function createPcmBlob(data: Float32Array): GeminiBlob {
 export async function generateContentWithSearch(prompt: string): Promise<string> {
     const ai = getAiInstance();
     try {
+        // gemini-2.5-flash supports googleSearch tool
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                responseMimeType: 'application/json' // Expecting structured return usually
+                // We generally want text back, not JSON, unless specified in prompt
             }
         });
-        return response.text || "No results found.";
+        
+        // Extract grounding metadata if available to append sources
+        let text = response.text || "No results found.";
+        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        
+        if (chunks && chunks.length > 0) {
+            text += "\n\n**Sources:**\n";
+            chunks.forEach((chunk: any) => {
+                if (chunk.web?.uri) {
+                    text += `- [${chunk.web.title || 'Source'}](${chunk.web.uri})\n`;
+                }
+            });
+        }
+        
+        return text;
     } catch (e) {
         console.error("Search Grounding Error:", e);
-        throw e;
+        return "I encountered an error while searching the web. Please try again.";
+    }
+}
+
+export async function generateJsonWithSearch(prompt: string, schema: any): Promise<any> {
+    const ai = getAiInstance();
+    try {
+        // Two-step process often works better: Search first, then extract JSON
+        // But 2.5 Flash is smart enough to do it in one go if instructed carefully.
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                responseMimeType: 'application/json',
+                responseSchema: schema
+            }
+        });
+        
+        const text = response.text;
+        if (!text) return null;
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("JSON Search Error:", e);
+        return null;
     }
 }
 
@@ -162,6 +202,42 @@ const findProspectsDeclaration: GeminiFunctionDeclaration = {
             businessLineName: { type: GeminiType.STRING, description: 'The name of the business line to find prospects for.' },
         },
         required: ['businessLineName'],
+    },
+};
+
+const analyzeRiskDeclaration: GeminiFunctionDeclaration = {
+    name: 'analyzeRisk',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Performs a deep "Pre-Mortem" risk analysis on a specific project by searching for common pitfalls in similar industries.',
+        properties: {
+            projectName: { type: GeminiType.STRING, description: 'The name of the project to analyze.' },
+        },
+        required: ['projectName'],
+    },
+};
+
+const analyzeNegotiationDeclaration: GeminiFunctionDeclaration = {
+    name: 'analyzeNegotiation',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Acts as a Negotiation Coach. Researches the client and deal to suggest leverage points and strategies.',
+        properties: {
+            dealName: { type: GeminiType.STRING, description: 'The name of the deal.' },
+        },
+        required: ['dealName'],
+    },
+};
+
+const getClientPulseDeclaration: GeminiFunctionDeclaration = {
+    name: 'getClientPulse',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Searches the web for recent news and social media activity about a client to find conversation starters.',
+        properties: {
+            clientName: { type: GeminiType.STRING, description: 'The name of the client.' },
+        },
+        required: ['clientName'],
     },
 };
 
@@ -320,6 +396,34 @@ const createProjectDeclaration: GeminiFunctionDeclaration = {
     },
 };
 
+const createEventDeclaration: GeminiFunctionDeclaration = {
+    name: 'createEvent',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Creates a new Event record in the Events module. Use this when the user talks about planning an event, workshop, or webinar.',
+        properties: {
+            name: { type: GeminiType.STRING, description: 'The name of the event.' },
+            location: { type: GeminiType.STRING, description: 'Location or "Online".' },
+            date: { type: GeminiType.STRING, description: 'Date of the event.' },
+        },
+        required: ['name'],
+    },
+};
+
+const createCandidateDeclaration: GeminiFunctionDeclaration = {
+    name: 'createCandidate',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Adds a new candidate to the HR recruitment pipeline.',
+        properties: {
+            name: { type: GeminiType.STRING, description: 'Name of the candidate.' },
+            roleApplied: { type: GeminiType.STRING, description: 'The role they are applying for.' },
+            email: { type: GeminiType.STRING, description: 'Email address if available.' },
+        },
+        required: ['name', 'roleApplied'],
+    },
+};
+
 const updateDealStatusDeclaration: GeminiFunctionDeclaration = {
     name: 'updateDealStatus',
     parameters: {
@@ -356,10 +460,15 @@ const assistantTools = [{ functionDeclarations: [
     createClientDeclaration,
     createDealDeclaration,
     createProjectDeclaration,
+    createEventDeclaration,
+    createCandidateDeclaration,
     updateDealStatusDeclaration,
     findProspectsDeclaration,
     queryPlatformDeclaration,
     sendEmailDeclaration,
+    analyzeRiskDeclaration,
+    analyzeNegotiationDeclaration,
+    getClientPulseDeclaration
 ] }];
 
 // --- Live API Service ---

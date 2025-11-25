@@ -30,6 +30,7 @@ import LandingPage from './components/LandingPage';
 import AuthPage from './pages/AuthPage'; 
 import AdminDashboard from './components/AdminDashboard'; 
 import { supabase } from './supabaseClient';
+import SocialMediaTab from './components/SocialMediaTab';
 
 let isApiKeyAvailable = true;
 try {
@@ -49,7 +50,7 @@ export const trackEvent = (action: string, category: string, label: string, valu
     }
 }
 
-export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'sales' | 'events' | 'hr' | 'projects' | 'crm' | 'team' | 'data' | 'settings' | 'admin';
+export type View = 'homepage' | 'businessLines' | 'clients' | 'deals' | 'sales' | 'events' | 'hr' | 'projects' | 'crm' | 'team' | 'data' | 'settings' | 'admin' | 'social';
 
 const MenuIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -152,10 +153,40 @@ export default function App() {
     onClientCreate: kanban.addClient,
     onDealCreate: kanban.addDeal,
     onProjectCreate: kanban.addProject,
+    onEventCreate: (data) => { kanban.addEvent(data); return "Event created."; },
+    onCandidateCreate: (data) => { kanban.addCandidate(data); return "Candidate added."; },
     onDealStatusUpdate: (dealId, status) => kanban.updateDeal(dealId, { status }),
     onTurnComplete: handleTurnComplete,
     onFindProspects: kanban.findProspectsByName,
     onPlatformQuery: kanban.getPlatformQueryResponse,
+    // Deep Intelligence Wiring
+    onAnalyzeRisk: async ({ projectName }) => {
+        const proj = kanban.projects.find(p => p.projectName.toLowerCase().includes(projectName.toLowerCase()));
+        if(proj) {
+            const res = await kanban.analyzeProjectRisk(proj);
+            return res;
+        }
+        return "Project not found.";
+    },
+    onAnalyzeNegotiation: async ({ dealName }) => {
+        const deal = kanban.deals.find(d => d.name.toLowerCase().includes(dealName.toLowerCase()));
+        if(deal) {
+            const client = kanban.clients.find(c => c.id === deal.clientId);
+            if(client) {
+                const res = await kanban.analyzeDealStrategy(deal, client);
+                return res;
+            }
+        }
+        return "Deal or Client not found.";
+    },
+    onGetClientPulse: async ({ clientName }) => {
+        const client = kanban.clients.find(c => c.name.toLowerCase().includes(clientName.toLowerCase()));
+        if(client) {
+            const res = await kanban.getClientPulse(client, { timeframe: 'last_month', location: 'any', scope: 'all', customQuery: '' });
+            return `Found ${res.length} recent updates. Check the client view.`;
+        }
+        return "Client not found.";
+    },
     currentBusinessLineId: selectedBusinessLineId,
     currentClientId: selectedClientId,
     currentDealId: selectedDealId,
@@ -267,6 +298,8 @@ export default function App() {
         }
     }
     
+    const defaultBusinessLine = kanban.businessLines[0];
+
     // Main Views
     switch (activeView) {
       case 'settings': return <SettingsView kanbanApi={kanban} />;
@@ -280,6 +313,7 @@ export default function App() {
       case 'events': return <EventsView events={kanban.events} kanbanApi={kanban} />;
       case 'hr': return <HRView candidates={kanban.candidates} employees={kanban.employees} kanbanApi={kanban} />;
       case 'projects': return <ProjectsView projects={kanban.projects} clients={kanban.clients} onSelectProject={handleSelectProject} onOpenUniversalInput={handleOpenUniversalInput} />;
+      case 'social': return defaultBusinessLine ? <SocialMediaTab businessLine={defaultBusinessLine} kanbanApi={kanban} /> : <div className="p-8 text-center text-gray-500">Create a Business Line to manage Social Media.</div>;
       case 'admin': return isSuperAdmin ? <AdminDashboard /> : <div className="p-8 text-center text-gray-500">Access Denied. Admin only.</div>;
       case 'homepage':
       default:

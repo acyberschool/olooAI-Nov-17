@@ -162,12 +162,22 @@ const DealDetailView: React.FC<DealDetailViewProps> = (props) => {
   const { deal, client, businessLine, onSelectClient, onSelectBusinessLine, kanbanApi } = props;
   const [activeTab, setActiveTab] = useState<DealTab>('Overview');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const handleUpdate = async (text: string) => {
         setIsUpdating(true);
         await kanbanApi.updateDealFromInteraction(deal.id, text);
         setIsUpdating(false);
     };
+
+    const handleNegotiationCoach = async () => {
+        setIsAnalyzing(true);
+        const report = await kanbanApi.analyzeDealStrategy(deal, client);
+        await kanbanApi.addDocument({ name: `Negotiation Strategy - ${deal.name}.md`, content: report }, 'Business Development', deal.id, 'deal');
+        alert("Analysis complete! Negotiation strategy saved to Documents.");
+        setIsAnalyzing(false);
+        setActiveTab('Documents');
+    }
 
     const handleClientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         kanbanApi.updateDeal(deal.id, { clientId: e.target.value });
@@ -186,23 +196,32 @@ const DealDetailView: React.FC<DealDetailViewProps> = (props) => {
 
   return (
     <div className="space-y-6">
-      <div className="text-base text-[#6B7280] flex items-center flex-wrap">
-        <span onClick={() => onSelectBusinessLine(businessLine.id)} className="hover:underline cursor-pointer">{businessLine.name}</span>
-        <span className="mx-2">&gt;</span>
-        <div className="flex items-center">
-             <span className="mr-2">Client:</span>
-             <select
-                value={client.id}
-                onChange={handleClientChange}
-                className="bg-transparent font-medium hover:bg-gray-100 rounded cursor-pointer focus:ring-2 focus:ring-brevo-cta"
-             >
-                 {props.clients.map(c => (
-                     <option key={c.id} value={c.id}>{c.name}</option>
-                 ))}
-             </select>
-        </div>
-        <span className="mx-2">&gt;</span>
-        <span className="text-[#111827] font-semibold">{deal.name}</span>
+      <div className="flex justify-between items-start">
+          <div className="text-base text-[#6B7280] flex items-center flex-wrap">
+            <span onClick={() => onSelectBusinessLine(businessLine.id)} className="hover:underline cursor-pointer">{businessLine.name}</span>
+            <span className="mx-2">&gt;</span>
+            <div className="flex items-center">
+                <span className="mr-2">Client:</span>
+                <select
+                    value={client.id}
+                    onChange={handleClientChange}
+                    className="bg-transparent font-medium hover:bg-gray-100 rounded cursor-pointer focus:ring-2 focus:ring-brevo-cta"
+                >
+                    {props.clients.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </select>
+            </div>
+            <span className="mx-2">&gt;</span>
+            <span className="text-[#111827] font-semibold">{deal.name}</span>
+          </div>
+          <button 
+            onClick={handleNegotiationCoach}
+            disabled={isAnalyzing}
+            className="bg-indigo-100 hover:bg-indigo-200 text-indigo-800 px-4 py-2 rounded-lg font-bold text-sm flex items-center disabled:opacity-70 transition-colors"
+          >
+            {isAnalyzing ? 'Thinking...' : '🧠 Negotiation Coach'}
+          </button>
       </div>
       
        <ContextualWalter
