@@ -72,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             <NavItem label="Homepage" view="homepage" activeView={activeView} onClick={setActiveView} icon={<HomeIcon />} />
             
             <div className="pt-4 pb-2">
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Core</p>
+                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Core Workspace</p>
             </div>
             {hasAccess('businessLines') && <NavItem label="Business Lines" view="businessLines" activeView={activeView} onClick={setActiveView} icon={<BusinessIcon />} />}
             {hasAccess('clients') && <NavItem label="Clients" view="clients" activeView={activeView} onClick={setActiveView} icon={<ClientsIcon />} />}
@@ -81,11 +81,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             {hasAccess('crm') && <NavItem label="CRM" view="crm" activeView={activeView} onClick={setActiveView} icon={<CrmIcon />} />}
 
             <div className="pt-4 pb-2">
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Modules</p>
+                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Advanced Modules</p>
             </div>
             {hasAccess('sales') && <NavItem label="Sales Pipeline" view="sales" activeView={activeView} onClick={setActiveView} icon={<SalesIcon />} />}
-            {hasAccess('events') && <NavItem label="Events" view="events" activeView={activeView} onClick={setActiveView} icon={<EventsIcon />} />}
-            {hasAccess('hr') && <NavItem label="HR & Team" view="hr" activeView={activeView} onClick={setActiveView} icon={<HRIcon />} />}
+            {hasAccess('events') && <NavItem label="Event Management" view="events" activeView={activeView} onClick={setActiveView} icon={<EventsIcon />} />}
+            {hasAccess('hr') && <NavItem label="HR & People" view="hr" activeView={activeView} onClick={setActiveView} icon={<HRIcon />} />}
             
             <div className="pt-4 pb-2">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Insights</p>

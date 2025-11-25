@@ -38,61 +38,53 @@ const ContextualWalter: React.FC<ContextualWalterProps> = ({
 
     return (
         <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-brevo-border">
-                <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-brevo-text-primary">Update {entityName} with Walter</h3>
-                    <span className="text-xs bg-teal-100 text-teal-800 px-2 py-1 rounded-full font-medium">AI Assistant</span>
-                </div>
-                <p className="text-sm text-brevo-text-secondary mb-4">Paste an email, meeting notes, or a quick summary. Walter will update the record and propose the next step.</p>
-                <textarea
-                    value={interactionText}
-                    onChange={(e) => setInteractionText(e.target.value)}
-                    rows={4}
-                    placeholder={placeholder || "e.g., Client loved the proposal but wants to negotiate the timeline..."}
-                    className="w-full bg-white border border-brevo-border rounded-md px-3 py-2 text-brevo-text-primary focus:ring-2 focus:ring-brevo-cta resize-none"
-                />
-                <div className="mt-3 flex justify-end">
-                    <button
-                        onClick={handleUpdate}
-                        disabled={isUpdating || !interactionText.trim()}
-                        className="bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-300 flex items-center"
-                    >
-                        {isUpdating ? (
-                            <>
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Analyzing...
-                            </>
-                        ) : 'Update'}
-                    </button>
+            <div className="bg-white p-1 rounded-2xl shadow-lg border border-gray-100 ring-1 ring-gray-100">
+                <div className="p-5 rounded-xl bg-gradient-to-b from-white to-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                            <span className="text-2xl mr-2">⚡</span> Update {entityName} with Walter
+                        </h3>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-4">Paste an email, notes, or just type what happened.</p>
+                    <textarea
+                        value={interactionText}
+                        onChange={(e) => setInteractionText(e.target.value)}
+                        rows={3}
+                        placeholder={placeholder || "e.g., Client loved the proposal..."}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:ring-2 focus:ring-black focus:border-black resize-none shadow-sm"
+                    />
+                    <div className="mt-3 flex justify-end">
+                        <button
+                            onClick={handleUpdate}
+                            disabled={isUpdating || !interactionText.trim()}
+                            className="bg-black hover:bg-gray-800 text-white font-bold py-2 px-6 rounded-full transition-all shadow-md disabled:bg-gray-300 flex items-center"
+                        >
+                            {isUpdating ? 'Analyzing...' : 'Process Update'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {proposedChanges && (proposedChanges.summary || proposedChanges.nextAction) && (
-                <div className="bg-blue-50 p-6 rounded-xl border-2 border-dashed border-blue-300 animate-fade-in-up">
-                    <h3 className="text-lg font-semibold text-blue-800 mb-4">Walter's Proposed Updates</h3>
-                    <div className="space-y-3 text-sm">
+                <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 shadow-inner animate-fade-in-up">
+                    <h3 className="text-lg font-bold text-indigo-900 mb-4 flex items-center"><span className="mr-2">🤖</span> Walter Proposes:</h3>
+                    <div className="space-y-3 text-sm bg-white/60 p-4 rounded-lg border border-indigo-100">
                         {proposedChanges.status && (
-                             <p><strong className="text-brevo-text-secondary">New Status:</strong> <span className="font-semibold text-blue-700 ml-1">{proposedChanges.status}</span></p>
+                             <p><strong className="text-indigo-800">New Status:</strong> <span className="font-semibold text-gray-900 ml-1">{proposedChanges.status}</span></p>
                         )}
                          {proposedChanges.stage && (
-                             <p><strong className="text-brevo-text-secondary">New Stage:</strong> <span className="font-semibold text-blue-700 ml-1">{proposedChanges.stage}</span></p>
+                             <p><strong className="text-indigo-800">New Stage:</strong> <span className="font-semibold text-gray-900 ml-1">{proposedChanges.stage}</span></p>
                         )}
                         {proposedChanges.summary && (
-                            <p><strong className="text-brevo-text-secondary">New Last Touch Summary:</strong> <span className="ml-1">{proposedChanges.summary}</span></p>
-                        )}
-                         {proposedChanges.aiFocus && (
-                            <p><strong className="text-brevo-text-secondary">Updated AI Focus:</strong> <span className="ml-1">{proposedChanges.aiFocus}</span></p>
+                            <p><strong className="text-indigo-800">Last Touch:</strong> <span className="ml-1 text-gray-700">{proposedChanges.summary}</span></p>
                         )}
                         {proposedChanges.nextAction && (
-                            <p><strong className="text-brevo-text-secondary">Proposed Next Action:</strong> <span className="font-semibold ml-1">{proposedChanges.nextAction}</span> (Due: {new Date(proposedChanges.nextActionDate!).toLocaleDateString()})</p>
+                            <p><strong className="text-indigo-800">Next Step:</strong> <span className="font-semibold ml-1 text-gray-900">{proposedChanges.nextAction}</span> <span className="text-gray-500 text-xs">(Due: {new Date(proposedChanges.nextActionDate!).toLocaleDateString()})</span></p>
                         )}
                     </div>
                     <div className="flex items-center space-x-3 mt-6">
-                        <button onClick={onApprove} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm">Approve Changes</button>
-                        <button onClick={onDismiss} className="text-blue-700 hover:text-blue-900 font-medium text-sm hover:underline">Dismiss</button>
+                        <button onClick={onApprove} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-sm transition-colors">Approve</button>
+                        <button onClick={onDismiss} className="text-gray-500 hover:text-gray-700 font-medium text-sm hover:underline px-3">Dismiss</button>
                     </div>
                 </div>
             )}

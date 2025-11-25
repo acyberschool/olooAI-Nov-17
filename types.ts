@@ -35,16 +35,23 @@ export interface OrganizationMember {
 
 // --- NEW MODULE TYPES ---
 
+export type EventStatus = 'Planning' | 'Confirmed' | 'Completed';
+
 export interface Event {
     id: string;
     organizationId: string;
     name: string;
     date?: string;
     location?: string;
-    status: 'Planning' | 'Confirmed' | 'Completed';
+    status: EventStatus;
     checklist: { id: string; text: string; isDone: boolean; owner?: string }[];
     partners?: string;
     impactNotes?: string;
+    // Deep Dive Fields
+    strategyTheme?: string;
+    speakerBios?: string;
+    contentAbstracts?: string;
+    roiAnalysis?: string;
 }
 
 export interface HRCandidate {
@@ -57,6 +64,7 @@ export interface HRCandidate {
     resumeUrl?: string;
     notes?: string;
     interviewDate?: string;
+    screeningScore?: number; // AI Generated
 }
 
 export interface HREmployee {
@@ -68,6 +76,8 @@ export interface HREmployee {
     email: string;
     startDate: string;
     status: 'Active' | 'Onboarding' | 'Offboarding';
+    compensationModel?: string; // e.g., "Base + Comm"
+    payrollStatus?: 'Paid' | 'Pending';
 }
 
 // --- EXISTING TYPES UPDATED WITH ORG_ID ---
@@ -145,12 +155,15 @@ export interface Client {
   leadScoreReason?: string;
 }
 
+export type SalesStage = 'Qualified' | 'Contact Made' | 'Demo Scheduled' | 'Proposal Made' | 'Negotiated' | 'Onboarded' | 'Botched';
+
 export interface Deal {
   id: string;
   organizationId: string;
   name: string;
   description: string;
   status: 'Open' | 'Closed - Won' | 'Closed - Lost';
+  salesStage?: SalesStage; // New granular stage
   clientId: string;
   businessLineId: string;
   playbookId?: string;

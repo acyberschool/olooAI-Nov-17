@@ -15,6 +15,7 @@ import DealsView from './DealsView';
 import ClientsView from './ClientsView';
 import ProjectsView from './ProjectsView';
 import SocialMediaTab from './SocialMediaTab';
+import DTWButton from './DTWButton';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -37,9 +38,6 @@ type HomepageTab = 'Today' | 'All tasks' | 'Deals' | 'Clients' | 'Projects' | 'S
 const TasksView: React.FC<TasksViewProps> = (props) => {
   const [activeTab, setActiveTab] = useState<HomepageTab>('Today');
 
-  // Mock a business line for the general social media view if needed, or use the first available one
-  // Ideally, SocialMediaTab takes a businessLine. For the homepage, we might show an aggregate or select the primary one.
-  // For now, we'll default to the first business line to show functionality, or placeholder.
   const defaultBusinessLine = props.businessLines[0];
 
   const tabContent = () => {
@@ -63,7 +61,14 @@ const TasksView: React.FC<TasksViewProps> = (props) => {
 
   return (
     <div>
-        <h2 className="text-2xl font-semibold text-brevo-text-primary mb-4">Homepage</h2>
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold text-brevo-text-primary">Homepage</h2>
+            <DTWButton 
+                label="Delegate Day Plan"
+                prompt="Review my tasks for today and generate a prioritized plan. Create subtasks for anything complex."
+                kanbanApi={props.kanbanApi}
+            />
+        </div>
         <Tabs
             tabs={['Today', 'All tasks', 'Deals', 'Clients', 'Projects', 'Social Media', 'Sales', 'Events', 'HR', 'Access']}
             activeTab={activeTab}

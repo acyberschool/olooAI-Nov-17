@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { HRCandidate, HREmployee } from '../types';
 import { useKanban } from '../hooks/useKanban';
 import Tabs from './Tabs';
+import DTWButton from './DTWButton';
 
 interface HRViewProps {
     candidates: HRCandidate[];
@@ -32,11 +33,19 @@ const HRView: React.FC<HRViewProps> = ({ candidates, employees, kanbanApi }) => 
 
     return (
         <div>
-            <h2 className="text-2xl font-semibold text-brevo-text-primary mb-6">HR & Team</h2>
-            <Tabs tabs={['Recruitment', 'Team']} activeTab={activeTab} setActiveTab={setActiveTab} />
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-brevo-text-primary">Autonomous HR Engine</h2>
+                <DTWButton 
+                    label="Draft Job Description"
+                    prompt="Draft a job description for a Senior Sales Representative, focusing on remote work and high commission."
+                    kanbanApi={kanbanApi}
+                />
+            </div>
+            
+            <Tabs tabs={['Recruitment', 'Onboarding', 'Payroll', 'Database']} activeTab={activeTab} setActiveTab={setActiveTab} />
             
             <div className="mt-6">
-                {activeTab === 'Recruitment' ? (
+                {activeTab === 'Recruitment' && (
                     <div>
                         <form onSubmit={handleAddCandidate} className="mb-8 bg-white p-4 rounded-xl border border-gray-200 shadow-sm max-w-3xl">
                             <h3 className="text-sm font-bold text-gray-700 mb-3">Add New Candidate</h3>
@@ -80,6 +89,14 @@ const HRView: React.FC<HRViewProps> = ({ candidates, employees, kanbanApi }) => 
                                                 <p className="font-medium">{c.name}</p>
                                                 <p className="text-xs text-gray-500">{c.roleApplied}</p>
                                                 <p className="text-xs text-blue-500 mt-1">{c.email}</p>
+                                                {status === 'Applied' && (
+                                                    <DTWButton 
+                                                        label="Screen" 
+                                                        prompt={`Screen candidate ${c.name} for the role of ${c.roleApplied}.`} 
+                                                        kanbanApi={kanbanApi}
+                                                        className="w-full text-xs mt-2 py-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
+                                                    />
+                                                )}
                                             </div>
                                         ))}
                                         {candidates.filter(c => c.status === status).length === 0 && (
@@ -90,7 +107,9 @@ const HRView: React.FC<HRViewProps> = ({ candidates, employees, kanbanApi }) => 
                             ))}
                         </div>
                     </div>
-                ) : (
+                )}
+                
+                {activeTab === 'Database' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
@@ -117,6 +136,13 @@ const HRView: React.FC<HRViewProps> = ({ candidates, employees, kanbanApi }) => 
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {activeTab === 'Payroll' && (
+                    <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                        <p className="mb-4">Walter automates payroll generation for contractors and staff.</p>
+                        <DTWButton label="Generate Monthly Payroll" prompt="Calculate payroll for all active employees for this month." kanbanApi={kanbanApi} />
                     </div>
                 )}
             </div>
