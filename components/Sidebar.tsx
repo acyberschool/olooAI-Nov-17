@@ -54,20 +54,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
   
   return (
     <>
-        {/* Backdrop for Mobile */}
+        {/* Backdrop for Mobile and Desktop (Dismissible Drawer) */}
         <div 
-            className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity lg:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             onClick={() => setIsOpen(false)}
         ></div>
 
         {/* Sidebar Drawer */}
-        <nav className={`fixed top-0 left-0 h-full w-64 bg-[#F3F4F6] border-r border-brevo-border flex flex-col z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} overflow-y-auto shadow-xl lg:shadow-none`}>
+        <nav className={`fixed top-0 left-0 h-full w-64 bg-[#F3F4F6] border-r border-brevo-border flex flex-col z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} overflow-y-auto shadow-xl`}>
         
         <div className="p-4 mb-2 flex justify-between items-center border-b border-brevo-border bg-white">
             <h2 className="text-xl font-bold text-[#111827] flex items-center gap-2">
                 olooAI
             </h2>
-            <button onClick={() => setIsOpen(false)} className="lg:hidden text-gray-500 hover:bg-gray-200 p-1 rounded">
+            <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:bg-gray-200 p-1 rounded">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
         </div>
@@ -79,39 +79,36 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             {/* 2. All tasks */}
             <NavItem label="All tasks" view="allTasks" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<TaskIcon />} />
             
-            {/* 3. CRM */}
-            <NavItem label="CRM" view="crm" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<CRMIcon />} />
-
-            {/* 4. Business Line */}
+            {/* 3. Business Line */}
             <NavItem label="Business Line" view="businessLines" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<BusinessIcon />} />
             
-            {/* 5. Deals */}
+            {/* 4. Deals */}
             <NavItem label="Deals" view="deals" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<DealsIcon />} />
             
-            {/* 6. Clients */}
+            {/* 5. Clients */}
             <NavItem label="Clients" view="clients" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<ClientsIcon />} />
             
-            {/* 7. Projects */}
+            {/* 6. Projects */}
             <NavItem label="Projects" view="projects" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<ProjectsIcon />} />
             
-            {/* 8. Social Media */}
+            {/* 7. Social Media */}
             <NavItem label="Social Media" view="social" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SocialIcon />} />
             
-            {/* 9. Sales */}
+            {/* 8. Sales */}
             <NavItem label="Sales" view="sales" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SalesIcon />} />
             
-            {/* 10. Events */}
+            {/* 9. Events */}
             <NavItem label="Events" view="events" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<EventsIcon />} />
             
-            {/* 11. HR */}
+            {/* 10. HR */}
             <NavItem label="HR" view="hr" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<HRIcon />} />
             
             <div className="my-2 border-t border-gray-200 mx-2"></div>
 
-            {/* 12. Access */}
+            {/* 11. Access */}
             <NavItem label="Access" view="access" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<AccessIcon />} />
             
-            {/* 13. Settings */}
+            {/* 12. Settings */}
             <NavItem label="Settings" view="settings" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />
         </ul>
         
