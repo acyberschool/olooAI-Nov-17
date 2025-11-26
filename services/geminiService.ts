@@ -167,7 +167,7 @@ export async function generateVideos(prompt: string): Promise<string | null> {
     }
 }
 
-// --- Function Calling Schemas ---
+// --- Function Calling Schemas (Relaxed for AI Inference) ---
 
 const queryPlatformDeclaration: GeminiFunctionDeclaration = {
     name: 'queryPlatform',
@@ -240,7 +240,7 @@ const createCrmEntryDeclaration: GeminiFunctionDeclaration = {
       clientName: { type: GeminiType.STRING, description: 'Client name.' },
       dealName: { type: GeminiType.STRING, description: 'Optional deal name.' },
     },
-    required: ['interactionType', 'content', 'clientName'],
+    required: ['interactionType', 'content'],
   },
 };
 
@@ -259,7 +259,7 @@ const createBoardItemDeclaration: GeminiFunctionDeclaration = {
       dealName: { type: GeminiType.STRING, description: 'Deal name.' },
       businessLineName: { type: GeminiType.STRING, description: 'Business Line name.' },
     },
-    required: ['itemType', 'title'],
+    required: ['title'], 
   },
 };
 
@@ -287,7 +287,7 @@ const createBusinessLineDeclaration: GeminiFunctionDeclaration = {
       customers: { type: GeminiType.STRING },
       aiFocus: { type: GeminiType.STRING },
     },
-    required: ['name', 'description', 'customers', 'aiFocus'],
+    required: ['name'], 
   },
 };
 
@@ -302,7 +302,7 @@ const createClientDeclaration: GeminiFunctionDeclaration = {
       aiFocus: { type: GeminiType.STRING },
       businessLineName: { type: GeminiType.STRING },
     },
-    required: ['name', 'description', 'aiFocus'],
+    required: ['name'],
   },
 };
 
@@ -319,7 +319,7 @@ const createDealDeclaration: GeminiFunctionDeclaration = {
       currency: { type: GeminiType.STRING },
       revenueModel: { type: GeminiType.STRING },
     },
-    required: ['name', 'description', 'clientName', 'value', 'currency', 'revenueModel'],
+    required: ['name'], 
   },
 };
 
@@ -337,7 +337,7 @@ const createProjectDeclaration: GeminiFunctionDeclaration = {
             impactMetric: { type: GeminiType.STRING },
             stage: { type: GeminiType.STRING },
         },
-        required: ['partnerName', 'projectName', 'goal'],
+        required: ['projectName'], 
     },
 };
 
@@ -365,7 +365,7 @@ const createCandidateDeclaration: GeminiFunctionDeclaration = {
             roleApplied: { type: GeminiType.STRING },
             email: { type: GeminiType.STRING },
         },
-        required: ['name', 'roleApplied'],
+        required: ['name'], 
     },
 };
 
@@ -411,6 +411,85 @@ const sendEmailDeclaration: GeminiFunctionDeclaration = {
     },
 };
 
+const logPaymentDeclaration: GeminiFunctionDeclaration = {
+    name: 'logPayment',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: "Logs a payment on a deal.",
+        properties: {
+            dealName: { type: GeminiType.STRING },
+            amount: { type: GeminiType.NUMBER },
+            currency: { type: GeminiType.STRING },
+            note: { type: GeminiType.STRING },
+        },
+        required: ['amount'],
+    },
+};
+
+const refineTaskChecklistDeclaration: GeminiFunctionDeclaration = {
+    name: 'refineTaskChecklist',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: "Refines a task checklist.",
+        properties: {
+            taskTitle: { type: GeminiType.STRING },
+            command: { type: GeminiType.STRING },
+        },
+        required: ['taskTitle'],
+    },
+};
+
+const generateSocialImageDeclaration: GeminiFunctionDeclaration = {
+    name: 'generateSocialImage',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: "Generates a social media image.",
+        properties: {
+            prompt: { type: GeminiType.STRING },
+        },
+        required: ['prompt'],
+    },
+};
+
+const generateSocialVideoDeclaration: GeminiFunctionDeclaration = {
+    name: 'generateSocialVideo',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: "Generates a social media video.",
+        properties: {
+            prompt: { type: GeminiType.STRING },
+        },
+        required: ['prompt'],
+    },
+};
+
+const generateDocumentDraftDeclaration: GeminiFunctionDeclaration = {
+    name: 'generateDocumentDraft',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: "Drafts a document.",
+        properties: {
+            prompt: { type: GeminiType.STRING },
+            category: { type: GeminiType.STRING },
+            ownerName: { type: GeminiType.STRING },
+            ownerType: { type: GeminiType.STRING },
+        },
+        required: ['prompt', 'category'],
+    },
+};
+
+const enhanceUserPromptDeclaration: GeminiFunctionDeclaration = {
+    name: 'enhanceUserPrompt',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: "Enhances a user prompt.",
+        properties: {
+            prompt: { type: GeminiType.STRING },
+        },
+        required: ['prompt'],
+    },
+};
+
 // --- Tools Export ---
 
 export const assistantTools = [{ functionDeclarations: [
@@ -430,7 +509,13 @@ export const assistantTools = [{ functionDeclarations: [
     sendEmailDeclaration,
     analyzeRiskDeclaration,
     analyzeNegotiationDeclaration,
-    getClientPulseDeclaration
+    getClientPulseDeclaration,
+    logPaymentDeclaration,
+    refineTaskChecklistDeclaration,
+    generateSocialImageDeclaration,
+    generateSocialVideoDeclaration,
+    generateDocumentDraftDeclaration,
+    enhanceUserPromptDeclaration
 ] }];
 
 // --- Live API Service ---

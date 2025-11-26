@@ -1,11 +1,10 @@
 
 import { getAiInstance } from '../config/geminiConfig';
-import { assistantTools } from './geminiService'; // Import the shared tool definitions
+import { assistantTools } from './geminiService';
 
-// Define a simpler interface for the new output
 export interface ToolExecutionRequest {
-    text: string; // The conversational response
-    functionCalls: { name: string; args: any }[]; // The actions to take
+    text: string;
+    functionCalls: { name: string; args: any }[];
 }
 
 const getSystemPrompt = (knownData: any, context: any) => `
@@ -54,18 +53,17 @@ export const processTextMessage = async (
             contents: contents,
             config: { 
                 systemInstruction,
-                tools: assistantTools, // <--- ACTUAL TOOLS ATTACHED HERE
+                tools: assistantTools, // Use Tools, not JSON Schema
             }
         });
         
-        // Extract Function Calls
         const functionCalls = response.functionCalls()?.map(call => ({
             name: call.name,
             args: call.args
         })) || [];
 
         return {
-            text: response.text || (functionCalls.length > 0 ? "Executing actions..." : "I didn't understand that."),
+            text: response.text || (functionCalls.length > 0 ? "Executing..." : "I didn't understand that."),
             functionCalls
         };
 
