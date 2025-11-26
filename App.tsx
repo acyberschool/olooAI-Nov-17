@@ -55,10 +55,10 @@ function App() {
     onBoardItemCreate: (item) => kanbanApi.addTask(item as any), 
     onCrmEntryCreate: (data) => kanbanApi.addCRMEntry(data),
     onTaskUpdate: (title, status) => Promise.resolve("Updated"),
-    onBusinessLineCreate: async (data) => { await kanbanApi.addBusinessLine(data); return "Business Line created"; },
-    onClientCreate: async (data) => { await kanbanApi.addClient(data); return "Client created"; },
-    onDealCreate: async (data) => { await kanbanApi.addDeal(data); return "Deal created"; },
-    onProjectCreate: async (data) => { await kanbanApi.addProject(data); return "Project created"; },
+    onBusinessLineCreate: async (data) => { const res = await kanbanApi.addBusinessLine(data); return typeof res === 'string' ? res : `Business Line ${res.name} created.`; },
+    onClientCreate: async (data) => { const c = await kanbanApi.addClient(data); return typeof c === 'string' ? c : "Client created."; },
+    onDealCreate: async (data) => { const d = await kanbanApi.addDeal(data); return typeof d === 'string' ? d : "Deal created."; },
+    onProjectCreate: async (data) => { const p = await kanbanApi.addProject(data); return typeof p === 'string' ? p : "Project created."; },
     onEventCreate: async (data) => { await kanbanApi.addEvent(data); return "Event created"; },
     onCandidateCreate: async (data) => { await kanbanApi.addCandidate(data); return "Candidate created"; },
     onSocialPostCreate: async (data) => { await kanbanApi.addSocialPost(data); return "Social post created"; },
@@ -69,7 +69,9 @@ function App() {
         const { prospects } = await kanbanApi.findProspects(bl, "Find prospects");
         return `Found ${prospects.length} prospects.`;
     },
-    onPlatformQuery: async (query) => "Here are your insights...", // Placeholder for now
+    onPlatformQuery: async (query) => {
+        return await kanbanApi.queryPlatform(query);
+    },
     onAnalyzeRisk: async (data) => {
         const project = kanbanApi.projects.find(p => p.projectName.toLowerCase().includes(data.projectName.toLowerCase()));
         if (!project) return "Project not found.";
@@ -97,6 +99,26 @@ function App() {
         if (!bl) return "Business Line not found.";
         await kanbanApi.getCompetitorInsights(bl, {});
         return "Competitor insights updated.";
+    },
+    onGenerateSocialImage: async (data) => {
+        return await kanbanApi.generateSocialImage(data.prompt) || "Image generation failed";
+    },
+    onGenerateSocialVideo: async (data) => {
+        return await kanbanApi.generateSocialVideo(data.prompt) || "Video generation failed";
+    },
+    onGenerateDocument: async (data) => {
+        // Attempt to infer owner. This is a heuristic.
+        // In a real app, Voice Assistant state should track 'current view'.
+        // We use `any` here to allow assignment of different types (BusinessLine, Client) without TS errors in this quick block
+        let owner: any = kanbanApi.businessLines[0]; 
+        let ownerType = 'businessLine';
+        if (kanbanApi.clients.length > 0) { owner = kanbanApi.clients[0]; ownerType = 'client'; }
+        
+        if (!owner) return "No valid owner found for document generation.";
+
+        const content = await kanbanApi.generateDocumentDraft(data.prompt, data.category, owner, ownerType as any);
+        await kanbanApi.addDocument({ name: `Draft - ${data.category}`, content }, data.category as any, owner.id, ownerType as any);
+        return "Document drafted and saved.";
     },
     systemContext: {
         clients: kanbanApi.clients.map(c => c.name),
@@ -206,11 +228,10 @@ function App() {
                   onOpenUniversalInput={handleOpenUniversalInput}
               />;
           case 'social':
-              // Default to first business line or show empty
               if (kanbanApi.businessLines.length > 0) {
                   return <SocialMediaTab businessLine={kanbanApi.businessLines[0]} kanbanApi={kanbanApi} />;
               }
-              return <div>Please create a business line first.</div>;
+              return <div className="p-8 text-center text-gray-500">Please create a business line first to manage social media.</div>;
           case 'sales':
               return <SalesView 
                   deals={kanbanApi.deals}
@@ -306,7 +327,7 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen bg-[#F9F9F9]">
+    <div className="flex h-screen bg-brevo-light-gray">
       <Sidebar 
         activeView={activeView} 
         setActiveView={setActiveView} 
@@ -321,17 +342,17 @@ function App() {
                 <button onClick={() => setIsSidebarOpen(true)} className="mr-3 text-gray-600">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <span className="font-bold text-lg">olooAI</span>
+                <span className="font-bold text-lg text-brevo-text-primary">olooAI</span>
             </div>
         </div>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative max-w-7xl mx-auto w-full">
             {renderContent()}
         </main>
 
         <div className="absolute bottom-6 right-6 z-30 flex flex-col items-end space-y-4">
             {isSpeaking && (
-                <div className="bg-black/80 text-white text-sm px-4 py-2 rounded-lg backdrop-blur-sm shadow-lg animate-fade-in-up max-w-xs">
+                <div className="bg-[#111827]/90 text-white text-sm px-6 py-3 rounded-2xl backdrop-blur-sm shadow-floating animate-fade-in-up max-w-xs">
                     {assistantTranscript}
                 </div>
             )}

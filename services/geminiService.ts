@@ -56,6 +56,20 @@ export function createPcmBlob(data: Float32Array): GeminiBlob {
 
 // --- Extended Gemini Capabilities ---
 
+export async function generateText(prompt: string): Promise<string> {
+    const ai = getAiInstance();
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        return response.text || "I couldn't generate a response.";
+    } catch (e) {
+        console.error("Text Generation Error:", e);
+        return "Error generating text.";
+    }
+}
+
 export async function generateContentWithSearch(prompt: string): Promise<string> {
     const ai = getAiInstance();
     try {
@@ -252,7 +266,7 @@ const createCrmEntryDeclaration: GeminiFunctionDeclaration = {
       clientName: { type: GeminiType.STRING, description: 'Client name.' },
       dealName: { type: GeminiType.STRING, description: 'Optional deal name.' },
     },
-    required: ['interactionType', 'content'],
+    required: ['content'],
   },
 };
 
@@ -393,7 +407,7 @@ const createSocialPostDeclaration: GeminiFunctionDeclaration = {
             visualPrompt: { type: GeminiType.STRING },
             date: { type: GeminiType.STRING }
         },
-        required: ['content', 'channel'],
+        required: ['content'],
     },
 };
 

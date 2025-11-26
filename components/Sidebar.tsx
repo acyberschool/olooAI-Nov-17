@@ -22,15 +22,14 @@ const NavItem: React.FC<{
   return (
     <li
       onClick={() => onClick(view)}
-      className={`flex items-center px-4 py-3 mb-1 rounded-xl cursor-pointer transition-all duration-200 group ${
+      className={`flex items-center px-5 py-3.5 mb-2 rounded-full cursor-pointer transition-all duration-300 group ${
         isActive
-          ? 'bg-[#111827] text-white shadow-md transform scale-[1.02]'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-[#111827]'
+          ? 'bg-white text-brevo-text-primary shadow-soft font-semibold'
+          : 'text-brevo-text-secondary hover:bg-white/50 hover:text-brevo-text-primary'
       }`}
     >
-      {React.cloneElement(icon, { className: `h-5 w-5 flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-[#111827]'}`})}
-      <span className="ml-3 font-medium text-sm">{label}</span>
-      {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white/50" />}
+      {React.cloneElement(icon, { className: `h-5 w-5 flex-shrink-0 ${isActive ? 'text-brevo-text-primary' : 'text-gray-400 group-hover:text-brevo-text-primary'}`})}
+      <span className="ml-3 text-sm">{label}</span>
     </li>
   );
 };
@@ -48,7 +47,6 @@ const HRIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg
 const SettingsIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-1.007 1.11-1.226.55-.22 1.156-.22 1.706 0 .55.219 1.02.684 1.11 1.226l.043.25a1.58 1.58 0 001.086 1.086l.25.043c.542.09 1.007.56 1.226 1.11.22.55.22 1.156 0 1.706-.219.55-.684 1.02-1.226 1.11l-.25.043a1.58 1.58 0 00-1.086 1.086l-.043.25c-.09.542-.56 1.007-1.11 1.226-.55.22-1.156.22-1.706 0-.55-.219-1.02-.684-1.11-1.226l-.043-.25a1.58 1.58 0 00-1.086-1.086l.25-.043c-.542-.09-1.007-.56-1.226-1.11-.22-.55-.22-1.156 0-1.706.219-.55.684-1.02 1.226-1.11l.25-.043a1.58 1.58 0 001.086-1.086l.043-.25z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.875a5.125 5.125 0 100 10.25 5.125 5.125 0 000-10.25z" /></svg>;
 const AccessIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>;
 const SocialIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" /></svg>;
-const CRMIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>;
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, setIsOpen, isSuperAdmin }) => {
   
@@ -56,23 +54,23 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
     <>
         {/* Backdrop for Mobile and Desktop (Dismissible Drawer) */}
         <div 
-            className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            className={`fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm z-40 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             onClick={() => setIsOpen(false)}
         ></div>
 
         {/* Sidebar Drawer */}
-        <nav className={`fixed top-0 left-0 h-full w-64 bg-[#F3F4F6] border-r border-brevo-border flex flex-col z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} overflow-y-auto shadow-xl`}>
+        <nav className={`fixed top-4 left-4 bottom-4 w-64 bg-brevo-sidebar rounded-3xl flex flex-col z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-[120%]'} shadow-2xl border border-white`}>
         
-        <div className="p-4 mb-2 flex justify-between items-center border-b border-brevo-border bg-white">
-            <h2 className="text-xl font-bold text-[#111827] flex items-center gap-2">
+        <div className="p-6 mb-2 flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-brevo-text-primary tracking-tight">
                 olooAI
             </h2>
-            <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:bg-gray-200 p-1 rounded">
+            <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-brevo-text-primary transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
         </div>
         
-        <ul className="space-y-1 flex-1 px-2 py-4">
+        <ul className="space-y-1 flex-1 px-4 overflow-y-auto no-scrollbar">
             {/* 1. Today */}
             <NavItem label="Today" view="today" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<HomeIcon />} />
             
@@ -103,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             {/* 10. HR */}
             <NavItem label="HR" view="hr" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<HRIcon />} />
             
-            <div className="my-2 border-t border-gray-200 mx-2"></div>
+            <div className="my-4 border-t border-gray-100 mx-2"></div>
 
             {/* 11. Access */}
             <NavItem label="Access" view="access" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<AccessIcon />} />
@@ -112,8 +110,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, se
             <NavItem label="Settings" view="settings" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />
         </ul>
         
-        <div className="mt-auto px-2 pb-4">
-            <ul className="space-y-1 pt-4 border-t border-brevo-border">
+        <div className="mt-auto px-4 pb-6">
+            <ul className="space-y-1 pt-2">
                 {isSuperAdmin && (
                     <NavItem label="Super Admin" view="admin" activeView={activeView} onClick={(v) => { setActiveView(v); setIsOpen(false); }} icon={<SettingsIcon />} />
                 )}

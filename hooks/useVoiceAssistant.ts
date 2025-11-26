@@ -24,6 +24,9 @@ interface UseVoiceAssistantProps {
   onAnalyzeNegotiation?: (data: { dealName: string }) => Promise<string>;
   onGetClientPulse?: (data: { clientName: string }) => Promise<string>;
   onGetCompetitorInsights?: (data: { businessLineName: string }) => Promise<string>;
+  onGenerateSocialImage?: (data: { prompt: string }) => Promise<string>;
+  onGenerateSocialVideo?: (data: { prompt: string }) => Promise<string>;
+  onGenerateDocument?: (data: { prompt: string; category: string }) => Promise<string>;
   
   currentBusinessLineId?: string | null;
   currentClientId?: string | null;
@@ -58,6 +61,9 @@ export const useVoiceAssistant = ({
   onAnalyzeNegotiation,
   onGetClientPulse,
   onGetCompetitorInsights,
+  onGenerateSocialImage,
+  onGenerateSocialVideo,
+  onGenerateDocument,
   currentDealId,
   systemContext = { clients: [], deals: [], businessLines: [], projects: [] },
 }: UseVoiceAssistantProps) => {
@@ -154,6 +160,9 @@ export const useVoiceAssistant = ({
                 case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available."; break;
                 case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available."; break;
                 case 'getCompetitorInsights': if(onGetCompetitorInsights) result = onGetCompetitorInsights(finalArgs as any); else result = "Competitor insights not available."; break;
+                case 'generateSocialImage': if(onGenerateSocialImage) result = onGenerateSocialImage(finalArgs as any); else result = "Image generation not available."; break;
+                case 'generateSocialVideo': if(onGenerateSocialVideo) result = onGenerateSocialVideo(finalArgs as any); else result = "Video generation not available."; break;
+                case 'generateDocumentDraft': if(onGenerateDocument) result = onGenerateDocument(finalArgs as any); else result = "Document generation not available."; break;
                 default: result = `Tool ${fc.name} not found.`;
             }
         } catch (e) {

@@ -1,6 +1,6 @@
 
 import { useState, useCallback, useEffect } from 'react';
-import { Task, BusinessLine, Client, Deal, Project, CRMEntry, Document, TeamMember, SocialPost, Event, HRCandidate, HREmployee, Contact, KanbanStatus, DocumentCategory, DocumentOwnerType } from '../types';
+import { Task, BusinessLine, Client, Deal, Project, CRMEntry, Document, TeamMember, SocialPost, Event, HRCandidate, HREmployee, Contact, KanbanStatus, DocumentCategory, DocumentOwnerType, DelegationPlan } from '../types';
 import { initialTasks, initialBusinessLines, initialClients, initialDeals, initialProjects, initialCRMEntries, initialDocuments, initialTeamMembers } from '../data/mockData';
 import * as geminiService from '../services/geminiService';
 import { processTextMessage } from '../services/routerBrainService';
@@ -404,7 +404,134 @@ export const useKanban = () => {
         return newEntry.id;
     }
 
+    // --- WALTER'S DESK: Bulk Execution Engine ---
+    const executeDelegationPlan = async (plan: DelegationPlan, onLog: (msg: string) => void) => {
+        onLog("🚀 Initializing Walter's Desk execution engine...");
+
+        // 1. Business Lines
+        for (const bl of plan.businessLinesToCreate) {
+            onLog(`Creating Business Line: ${bl.name}...`);
+            await addBusinessLine(bl);
+        }
+
+        // 2. Clients (Infer BL if needed)
+        for (const cl of plan.clientsToCreateOrUpdate) {
+            onLog(`Processing Client: ${cl.name}...`);
+            // Find or Create logic handled in addClient
+            await addClient(cl);
+        }
+
+        // 3. Projects
+        for (const pr of plan.projectsToCreate) {
+            onLog(`Creating Project: ${pr.projectName}...`);
+            // infer client ID from name if needed
+            await addProject(pr);
+        }
+
+        // 4. Deals
+        for (const deal of plan.dealsToCreate) {
+            onLog(`Creating Deal: ${deal.name}...`);
+            await addDeal(deal);
+        }
+
+        // 5. Events
+        for (const evt of plan.eventsToCreate) {
+            onLog(`Scheduling Event: ${evt.name}...`);
+            await addEvent(evt);
+        }
+
+        // 6. Tasks (Batch)
+        for (const task of plan.tasksToCreate) {
+            // Resolve IDs based on names
+            let clientId, dealId, businessLineId, projectId;
+            
+            if (task.clientName) clientId = clients.find(c => c.name === task.clientName)?.id;
+            if (task.projectName) projectId = projects.find(p => p.projectName === task.projectName)?.id;
+            
+            await addTask({ ...task, clientId, projectId });
+        }
+        if (plan.tasksToCreate.length > 0) onLog(`✅ Created ${plan.tasksToCreate.length} tasks.`);
+
+        // 7. Wiki Pages (New)
+        for (const wiki of plan.wikiPagesToCreate) {
+            const client = clients.find(c => c.name === wiki.clientName);
+            if (client) {
+                onLog(`Generating Wiki Page: ${wiki.title} for ${client.name}...`);
+                const content = await geminiService.generateText(`Draft a ${wiki.type} for ${client.name}. Title: ${wiki.title}. Context: ${wiki.content}`);
+                // Save as a Document with type 'Playbook' for now, or add to client wiki array
+                addDocument({ name: wiki.title, content }, 'Playbooks', client.id, 'client');
+                
+                // In a real app with 'wikiPages' table:
+                // await addWikiPage({ ...wiki, clientId: client.id, content });
+            }
+        }
+
+        // 8. CRM Entries
+        for (const entry of plan.crmEntriesToCreate) {
+            onLog(`Logging CRM Note for ${entry.clientName}...`);
+            await addCRMEntry({ ...entry, interactionType: 'note', content: entry.summary });
+        }
+
+        onLog("✨ All actions completed successfully.");
+    };
+
     // --- Gemini / AI Integrations ---
+
+    const logPaymentOnDeal = (dealId: string, amount: number, note: string) => {
+        const deal = deals.find(d => d.id === dealId);
+        if (deal) {
+            const newAmount = (deal.amountPaid || 0) + amount;
+            updateDeal(dealId, { amountPaid: newAmount });
+            addCRMEntry({
+                clientId: deal.clientId,
+                dealId: deal.id,
+                interactionType: 'note',
+                content: `Payment logged: ${deal.currency} ${amount}. ${note}`
+            });
+        }
+    }
+
+    const analyzeDealStrategy = async (deal: Deal, client: Client) => {
+        return await geminiService.generateContentWithSearch(`Act as a negotiation coach for deal "${deal.name}" ($${deal.value}) with client "${client.name}". Search for client financial news. Suggest 3 leverage points.`);
+    }
+
+    const analyzeProjectRisk = async (project: Project) => {
+        return await geminiService.generateContentWithSearch(`Perform a pre-mortem risk analysis for project "${project.projectName}" (Goal: ${project.goal}). Search for common failure modes in this domain. Output a markdown report.`);
+    }
+
+    // Improved findProspects
+    const findProspects = async (bl: BusinessLine, prompt: string) => {
+        const searchPrompt = `Find potential clients for a business line "${bl.name}" (${bl.description}). ${prompt}. Return JSON { "prospects": [{ "name": string, "likelyNeed": string }] }`;
+        const json = await geminiService.generateJsonWithSearch(searchPrompt, {
+            type: 'OBJECT',
+            properties: {
+                prospects: {
+                    type: 'ARRAY',
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            name: { type: 'STRING' },
+                            likelyNeed: { type: 'STRING' }
+                        }
+                    }
+                }
+            }
+        });
+        // Generate IDs for UI
+        const prospects = json?.prospects?.map((p: any, i: number) => ({ ...p, id: `prospect-${Date.now()}-${i}` })) || [];
+        return { prospects, sources: [] };
+    }
+
+    // New queryPlatform
+    const queryPlatform = async (query: string) => {
+        const context = {
+            deals: deals.map(d => ({ name: d.name, value: d.value, stage: d.status, client: clients.find(c=>c.id===d.clientId)?.name })),
+            tasks: tasks.filter(t => t.status !== 'Done').map(t => ({ title: t.title, due: t.dueDate, priority: t.priority })),
+            clients: clients.map(c => c.name)
+        };
+        const prompt = `Answer this question about the user's data: "${query}". Data: ${JSON.stringify(context)}`;
+        return await geminiService.generateText(prompt);
+    }
 
     const processTextAndExecute = useCallback(async (text: string, context: any, file?: any) => {
         const result = await processTextMessage(text, {
@@ -453,6 +580,39 @@ export const useKanban = () => {
                 if (project) {
                     const report = await analyzeProjectRisk(project);
                     addDocument({ name: `Risk Report - ${project.projectName}`, content: report }, 'SOPs', project.id, 'project');
+                }
+            }
+            if (call.name === 'analyzeNegotiation') {
+                const deal = deals.find(d => d.name.toLowerCase().includes(args.dealName.toLowerCase()));
+                if (deal) {
+                    const client = clients.find(c => c.id === deal.clientId);
+                    if (client) {
+                        const report = await analyzeDealStrategy(deal, client);
+                        addDocument({ name: `Negotiation Strategy - ${deal.name}`, content: report }, 'Business Development', deal.id, 'deal');
+                    }
+                }
+            }
+            if (call.name === 'getClientPulse') {
+                // Typically returns JSON for UI, but via router we save as Note/Doc
+                const client = clients.find(c => c.name.toLowerCase().includes(args.clientName.toLowerCase()));
+                if (client) {
+                    const pulse = await getClientPulse(client, {});
+                    const summary = pulse.map((p: any) => `- ${p.source}: ${p.content} (${p.date})`).join('\n');
+                    addCRMEntry({ clientId: client.id, content: `Client Pulse Scan:\n${summary}`, interactionType: 'ai_action' });
+                }
+            }
+            if (call.name === 'logPayment') {
+                const deal = deals.find(d => d.name.toLowerCase().includes(args.dealName.toLowerCase()));
+                if (deal) {
+                    logPaymentOnDeal(deal.id, args.amount, args.note || 'Payment logged via AI');
+                }
+            }
+            if (call.name === 'findProspects') {
+                const bl = businessLines.find(b => b.name.toLowerCase().includes(args.businessLineName.toLowerCase()));
+                if (bl) {
+                    const { prospects } = await findProspects(bl, "Find prospects");
+                    const list = prospects.map((p: any) => `- ${p.name}: ${p.likelyNeed}`).join('\n');
+                    addDocument({ name: `Prospects List - ${bl.name}`, content: list }, 'Business Development', bl.id, 'businessLine');
                 }
             }
         }
@@ -507,12 +667,6 @@ export const useKanban = () => {
                 engagementHook: 'What do you think?'
             }
         ];
-    }
-
-    const findProspects = async (bl: BusinessLine, prompt: string) => {
-        const response = await geminiService.generateContentWithSearch(prompt);
-        // Simple parsing simulation. In real app, use JSON mode.
-        return { prospects: [{ id: 'p1', name: 'Found via Search', likelyNeed: 'Service' }], sources: [] };
     }
 
     const getClientPulse = async (client: Client, filters: any, customPrompt?: string) => {
@@ -573,18 +727,6 @@ export const useKanban = () => {
 
     const updatePlaybook = (id: string, steps: any[]) => {
         // ... implementation
-    }
-
-    const analyzeDealStrategy = async (deal: Deal, client: Client) => {
-        return await geminiService.generateContentWithSearch(`Act as a negotiation coach for deal "${deal.name}" ($${deal.value}) with client "${client.name}". Search for client financial news. Suggest 3 leverage points.`);
-    }
-
-    const analyzeProjectRisk = async (project: Project) => {
-        return await geminiService.generateContentWithSearch(`Perform a pre-mortem risk analysis for project "${project.projectName}" (Goal: ${project.goal}). Search for common failure modes in this domain. Output a markdown report.`);
-    }
-
-    const logPaymentOnDeal = (dealId: string, amount: number, note: string) => {
-        updateDeal(dealId, { amountPaid: (deals.find(d => d.id === dealId)?.amountPaid || 0) + amount });
     }
 
     const dismissSuggestions = (type: string, id: string) => {
@@ -683,10 +825,12 @@ export const useKanban = () => {
         getClientPulse, getClientOpportunities, generateLeadScore,
         getCompetitorInsights,
         getPlatformInsights,
+        queryPlatform,
         researchSubtask, generateMeetingTranscript, refineTaskChecklist,
         generateMarketingCollateralContent, enhanceUserPrompt,
         regeneratePlaybook, updatePlaybook,
         inviteMember,
-        dismissSuggestions
+        dismissSuggestions,
+        executeDelegationPlan // Exported new function
     };
 }

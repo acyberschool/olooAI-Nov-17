@@ -80,6 +80,31 @@ export interface HREmployee {
     payrollStatus?: 'Paid' | 'Pending';
 }
 
+// --- WIKI & WALTER'S DESK TYPES ---
+
+export interface WikiPage {
+    id: string;
+    clientId: string;
+    title: string;
+    type: 'Concept Note' | 'Playbook' | 'Meeting Notes' | 'Pitch Deck' | 'SOP' | 'General';
+    content: string; // Markdown
+    tags: string[];
+    lastUpdated: string;
+    sourceFileUrl?: string;
+}
+
+export interface DelegationPlan {
+    summary_text: string;
+    businessLinesToCreate: Partial<BusinessLine>[];
+    clientsToCreateOrUpdate: (Partial<Client> & { businessLineName?: string })[];
+    projectsToCreate: (Partial<Project> & { clientName?: string })[];
+    dealsToCreate: (Partial<Deal> & { clientName?: string })[];
+    eventsToCreate: Partial<Event>[];
+    tasksToCreate: (Partial<Task> & { clientName?: string; projectName?: string })[];
+    wikiPagesToCreate: (Partial<WikiPage> & { clientName?: string })[];
+    crmEntriesToCreate: (Partial<CRMEntry> & { clientName?: string })[];
+}
+
 // --- EXISTING TYPES UPDATED WITH ORG_ID ---
 
 export interface Contact {
@@ -124,6 +149,7 @@ export interface PlaybookStep {
   id: string;
   title: string;
   description: string;
+  steps?: string[]; // Support nested steps if needed
 }
 
 export interface Playbook {
@@ -153,6 +179,7 @@ export interface Client {
   proposedNextActionDueDate?: string;
   leadScore?: number;
   leadScoreReason?: string;
+  wikiPages?: WikiPage[]; // Attached wiki pages
 }
 
 export type SalesStage = 'Qualified' | 'Contact Made' | 'Demo Scheduled' | 'Proposal Made' | 'Negotiated' | 'Onboarded' | 'Botched';
@@ -223,6 +250,7 @@ export interface Document {
   ownerType: DocumentOwnerType;
   createdAt: string;
   note?: string;
+  content?: string;
 }
 
 export interface Opportunity {

@@ -15,7 +15,7 @@ import DealsView from './DealsView';
 import ClientsView from './ClientsView';
 import ProjectsView from './ProjectsView';
 import SocialMediaTab from './SocialMediaTab';
-import DTWButton from './DTWButton';
+import UploadDelegateModal from './UploadDelegateModal'; // Import new modal
 import TeamView from './TeamView';
 import SettingsView from './SettingsView';
 
@@ -41,6 +41,9 @@ type HomepageTab = 'Today' | 'All tasks' | 'Deals' | 'Clients' | 'Projects' | 'S
 const TasksView: React.FC<TasksViewProps> = (props) => {
   const [activeTab, setActiveTab] = useState<HomepageTab>((props.initialTab as HomepageTab) || 'Today');
   const [overdueReminders, setOverdueReminders] = useState<Task[]>([]);
+  
+  // Walter's Desk Modal State
+  const [isWaltersDeskOpen, setIsWaltersDeskOpen] = useState(false);
 
   useEffect(() => {
     if (props.initialTab) {
@@ -50,7 +53,7 @@ const TasksView: React.FC<TasksViewProps> = (props) => {
 
   const defaultBusinessLine = props.businessLines[0];
 
-  // 4-Hour Reminder Logic: Check for tasks created > 4 hours ago that are still 'To Do' and high priority or explicitly tagged as reminder
+  // 4-Hour Reminder Logic
   useEffect(() => {
       const checkReminders = () => {
           const now = new Date();
@@ -63,7 +66,7 @@ const TasksView: React.FC<TasksViewProps> = (props) => {
           setOverdueReminders(reminders);
       };
       checkReminders();
-      const interval = setInterval(checkReminders, 60000); // Check every minute
+      const interval = setInterval(checkReminders, 60000);
       return () => clearInterval(interval);
   }, [props.tasks]);
 
@@ -81,30 +84,43 @@ const TasksView: React.FC<TasksViewProps> = (props) => {
         case 'Sales': return <SalesView deals={props.deals} clients={props.clients} onSelectDeal={props.onSelectDeal} onOpenUniversalInput={props.onOpenUniversalInput} />;
         case 'Events': return <EventsView events={props.kanbanApi.events} kanbanApi={props.kanbanApi} />;
         case 'HR': return <HRView candidates={props.kanbanApi.candidates} employees={props.kanbanApi.employees} kanbanApi={props.kanbanApi} />;
-        case 'Access': return <TeamView />; // Re-using TeamView as the Access management page
+        case 'Access': return <TeamView />;
         case 'Settings': return <SettingsView kanbanApi={props.kanbanApi} />;
         default: return null;
     }
   }
 
   return (
-    <div>
-        <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold text-brevo-text-primary">Homepage</h2>
-            <DTWButton 
-                label="Delegate Day Plan"
-                prompt="Review my tasks for today and generate a prioritized plan. Create subtasks for anything complex."
-                kanbanApi={props.kanbanApi}
-            />
+    <div className="space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <h2 className="text-3xl font-bold text-brevo-text-primary tracking-tight">Good morning</h2>
+            
+            {/* New Walter's Desk Button */}
+            <button 
+                onClick={() => setIsWaltersDeskOpen(true)}
+                className="flex items-center bg-[#111827] hover:bg-black text-white font-bold py-2.5 px-6 rounded-full shadow-soft hover:shadow-lg transition-all transform hover:-translate-y-0.5 border-2 border-white/20"
+            >
+                <span className="mr-2 text-xl">⚡</span>
+                Walter's Desk
+            </button>
         </div>
+        
         <Tabs
             tabs={['Today', 'All tasks', 'Deals', 'Clients', 'Projects', 'Social Media', 'Sales', 'Events', 'HR', 'Access', 'Settings']}
             activeTab={activeTab}
             setActiveTab={setActiveTab as (tab: string) => void}
         />
-        <div className="mt-6">
+        
+        <div className="animate-fade-in-up">
             {tabContent()}
         </div>
+
+        {/* Walter's Desk Modal */}
+        <UploadDelegateModal 
+            isOpen={isWaltersDeskOpen} 
+            onClose={() => setIsWaltersDeskOpen(false)} 
+            kanbanApi={props.kanbanApi} 
+        />
     </div>
   );
 };
@@ -144,28 +160,28 @@ const TodayTab: React.FC<TasksViewProps & { overdueReminders: Task[] }> = (props
             
             {/* 4-Hour Reminder Alert */}
             {props.overdueReminders.length > 0 && (
-                <div className="bg-red-50 border border-red-200 p-4 rounded-xl animate-pulse">
-                    <h4 className="text-red-800 font-bold flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                        Walter's Attention Needed ({props.overdueReminders.length})
-                    </h4>
-                    <p className="text-red-700 text-sm mt-1">These items are pending for more than 4 hours. Please review.</p>
-                    <div className="mt-2 space-y-1">
-                        {props.overdueReminders.slice(0,3).map(t => (
-                            <div key={t.id} className="text-xs text-red-600 font-medium bg-white/50 px-2 py-1 rounded cursor-pointer" onClick={() => props.onSelectTask(t)}>
-                                {t.title}
-                            </div>
-                        ))}
+                <div className="bg-soft-rose border border-soft-rose text-soft-rose-text p-6 rounded-3xl shadow-sm animate-pulse flex items-start gap-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mt-1 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                    <div>
+                        <h4 className="font-bold text-lg">Walter's Attention Needed ({props.overdueReminders.length})</h4>
+                        <p className="text-sm opacity-80 mt-1 mb-3">These items are pending for more than 4 hours.</p>
+                        <div className="flex flex-wrap gap-2">
+                            {props.overdueReminders.slice(0,3).map(t => (
+                                <div key={t.id} className="text-xs font-bold bg-white px-3 py-1 rounded-full cursor-pointer shadow-sm" onClick={() => props.onSelectTask(t)}>
+                                    {t.title}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
 
-            <div className="bg-white p-6 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-brevo-border">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-brevo-text-primary">What's on for today</h3>
+            <div className="bg-white p-8 rounded-3xl shadow-soft border border-transparent">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-brevo-text-primary">What's on for today</h3>
                     <button
                         onClick={handleAddTaskClick}
-                        className="flex items-center bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+                        className="flex items-center bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-6 rounded-full transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                         >
                         <PlusIcon /> Add Task
                     </button>
@@ -173,18 +189,26 @@ const TodayTab: React.FC<TasksViewProps & { overdueReminders: Task[] }> = (props
                 {todaysTasks.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {todaysTasks.map(task => (
-                            <div key={task.id} onClick={() => props.onSelectTask(task)} className="bg-white p-4 rounded-lg border border-brevo-border hover:border-brevo-cta-hover cursor-pointer">
-                            <p className="font-semibold text-brevo-text-primary">{task.title}</p>
-                            <p className="text-xs text-brevo-text-secondary mt-1">{new Date(task.dueDate!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                            {props.clients.find(c => c.id === task.clientId) && <p className="text-xs text-blue-700 mt-2">{props.clients.find(c => c.id === task.clientId)?.name}</p>}
+                            <div key={task.id} onClick={() => props.onSelectTask(task)} className="bg-brevo-sidebar p-5 rounded-2xl border border-transparent hover:border-gray-200 hover:bg-white hover:shadow-lg transition-all cursor-pointer group">
+                                <p className="font-semibold text-brevo-text-primary text-lg group-hover:text-black transition-colors">{task.title}</p>
+                                <p className="text-sm text-brevo-text-secondary mt-2 font-medium">{new Date(task.dueDate!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                {props.clients.find(c => c.id === task.clientId) && (
+                                    <span className="inline-block mt-3 text-xs font-bold bg-soft-blue text-soft-blue-text px-3 py-1 rounded-full">
+                                        {props.clients.find(c => c.id === task.clientId)?.name}
+                                    </span>
+                                )}
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <p className="text-center text-brevo-text-secondary py-8">Nothing scheduled for today. Enjoy your day!</p>
+                    <div className="text-center py-12">
+                        <p className="text-brevo-text-secondary text-lg">Nothing scheduled for today.</p>
+                        <p className="text-sm text-gray-400 mt-2">Enjoy your calm day!</p>
+                    </div>
                 )}
             </div>
-            <div>
+            
+            <div className="bg-white p-6 rounded-3xl shadow-soft">
                 <CalendarView {...props} />
             </div>
         </div>
@@ -201,23 +225,23 @@ const AllTasksTab: React.FC<TasksViewProps> = (props) => {
     }
 
     return (
-        <div>
-            <div className="flex justify-between items-center mb-4">
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <button
                     onClick={handleAddTaskClick}
-                    className="flex items-center bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+                    className="flex items-center bg-brevo-cta hover:bg-brevo-cta-hover text-white font-bold py-2 px-6 rounded-full transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
                     <PlusIcon /> Add Task
                 </button>
-                <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                    <button onClick={() => setViewMode('kanban')} className={`px-4 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-brevo-cta text-white' : 'text-brevo-text-secondary hover:bg-gray-200'}`}>Kanban</button>
-                    <button onClick={() => setViewMode('calendar')} className={`px-4 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-brevo-cta text-white' : 'text-brevo-text-secondary hover:bg-gray-200'}`}>Calendar</button>
-                    <button onClick={() => setViewMode('gantt')} className={`px-4 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'gantt' ? 'bg-brevo-cta text-white' : 'text-brevo-text-secondary hover:bg-gray-200'}`}>Gantt</button>
+                <div className="flex items-center bg-white rounded-full p-1 shadow-sm border border-gray-100">
+                    <button onClick={() => setViewMode('kanban')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${viewMode === 'kanban' ? 'bg-brevo-cta text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Kanban</button>
+                    <button onClick={() => setViewMode('calendar')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${viewMode === 'calendar' ? 'bg-brevo-cta text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Calendar</button>
+                    <button onClick={() => setViewMode('gantt')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${viewMode === 'gantt' ? 'bg-brevo-cta text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Gantt</button>
                 </div>
             </div>
             {viewMode === 'kanban' && <KanbanBoard {...props} />}
-            {viewMode === 'calendar' && <CalendarView {...props} />}
-            {viewMode === 'gantt' && <GanttChartView tasks={props.tasks} onSelectTask={props.onSelectTask} />}
+            {viewMode === 'calendar' && <div className="bg-white p-6 rounded-3xl shadow-soft"><CalendarView {...props} /></div>}
+            {viewMode === 'gantt' && <div className="bg-white p-6 rounded-3xl shadow-soft"><GanttChartView tasks={props.tasks} onSelectTask={props.onSelectTask} /></div>}
         </div>
     );
 }

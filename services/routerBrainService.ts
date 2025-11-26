@@ -59,7 +59,7 @@ export const processTextMessage = async (
             }
         });
         
-        const functionCalls = response.functionCalls()?.map(call => ({
+        const functionCalls = response.functionCalls?.map(call => ({
             name: call.name,
             args: call.args
         })) || [];

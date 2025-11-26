@@ -29,7 +29,7 @@ interface ClientDetailViewProps {
   onOpenUniversalInput: (context: UniversalInputContext) => void;
 }
 
-type ClientTab = 'Overview' | 'Work' | 'Conversations' | 'Contacts' | 'Client Pulse' | 'Documents' | 'AI Ideas';
+type ClientTab = 'Overview' | 'Wiki' | 'Work' | 'Conversations' | 'Contacts' | 'Client Pulse' | 'Documents' | 'AI Ideas';
 
 const EditableTitle: React.FC<{ value: string, onSave: (val: string) => void }> = ({ value, onSave }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -134,6 +134,7 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
     const tabContent = () => {
         switch (activeTab) {
             case 'Overview': return <OverviewTab {...props} />;
+            case 'Wiki': return <WikiTab {...props} />;
             case 'Contacts': return <ContactsTab client={client} kanbanApi={props.kanbanApi} />;
             case 'Work': return <WorkTab {...props} />;
             case 'Conversations': return <ConversationsTab {...props} />;
@@ -194,7 +195,7 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
         />
 
         <Tabs
-            tabs={['Overview', 'Contacts', 'Work', 'Conversations', 'Client Pulse', 'Documents', 'AI Ideas']}
+            tabs={['Overview', 'Wiki', 'Contacts', 'Work', 'Conversations', 'Client Pulse', 'Documents', 'AI Ideas']}
             activeTab={activeTab}
             setActiveTab={setActiveTab as (tab: string) => void}
         />
@@ -204,6 +205,48 @@ const ClientDetailView: React.FC<ClientDetailViewProps> = (props) => {
     </div>
   );
 };
+
+const WikiTab: React.FC<ClientDetailViewProps> = ({ client, documents }) => {
+    // In a real app, filter by type='Playbook' or 'Concept Note' or dedicated table
+    // For demo, we show docs categorized as 'Playbooks' or 'Templates' as "Wiki Pages"
+    const wikiDocs = documents.filter(d => (d.ownerId === client.id) && (d.category === 'Playbooks' || d.category === 'Templates' || d.category === 'SOPs'));
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-brevo-border">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-semibold text-brevo-text-primary">Client Knowledge Base</h3>
+                    <button className="bg-gray-100 hover:bg-gray-200 text-brevo-text-primary px-4 py-2 rounded-lg text-sm font-medium">
+                        + New Page
+                    </button>
+                </div>
+                
+                {wikiDocs.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {wikiDocs.map(doc => (
+                            <div key={doc.id} className="bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-blue-300 cursor-pointer transition-all">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h4 className="font-bold text-lg text-gray-900">{doc.name}</h4>
+                                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{doc.category}</span>
+                                </div>
+                                <p className="text-sm text-gray-500 line-clamp-3">{doc.content || "No preview available."}</p>
+                                <div className="mt-4 flex justify-between items-center text-xs text-gray-400">
+                                    <span>Updated {new Date(doc.createdAt).toLocaleDateString()}</span>
+                                    <span className="text-blue-600 hover:underline">Read more &rarr;</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                        <p className="text-gray-500 mb-2">No wiki pages yet.</p>
+                        <p className="text-sm text-gray-400">Use "Walter's Desk" to upload files and auto-generate this wiki.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 const OverviewTab: React.FC<ClientDetailViewProps> = ({ client, kanbanApi, onBack }) => {
     const isSuperAdmin = kanbanApi.currentUserMember?.role === 'Admin' || kanbanApi.currentUserMember?.role === 'Owner';
