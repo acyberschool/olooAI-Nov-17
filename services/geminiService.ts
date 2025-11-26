@@ -59,17 +59,14 @@ export function createPcmBlob(data: Float32Array): GeminiBlob {
 export async function generateContentWithSearch(prompt: string): Promise<string> {
     const ai = getAiInstance();
     try {
-        // gemini-2.5-flash supports googleSearch tool
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                // We generally want text back, not JSON, unless specified in prompt
             }
         });
         
-        // Extract grounding metadata if available to append sources
         let text = response.text || "No results found.";
         const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
@@ -92,9 +89,6 @@ export async function generateContentWithSearch(prompt: string): Promise<string>
 export async function generateJsonWithSearch(prompt: string, schema: any): Promise<any> {
     const ai = getAiInstance();
     try {
-        // Two-step process often works better: Search first, then extract JSON
-        // But 2.5 Flash is smart enough to do it in one go if instructed carefully.
-        
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -141,36 +135,26 @@ export async function generateImages(prompt: string): Promise<string | null> {
 export async function generateVideos(prompt: string): Promise<string | null> {
     const ai = getAiInstance();
     try {
-        // Veo 3.1 generation
         let operation = await ai.models.generateVideos({
             model: 'veo-3.1-fast-generate-preview',
             prompt: prompt,
             config: {
                 numberOfVideos: 1,
                 resolution: '720p',
-                aspectRatio: '16:9' // Default social format
+                aspectRatio: '16:9'
             }
         });
 
-        // Poll for completion (simplified for this context, usually takes time)
-        // In a real app, we'd handle this async with a job queue or long polling loop.
-        // For this demo, we attempt to get the operation result after a short delay
-        // acknowledging that real video gen takes > 10s.
-        
-        // Since we can't block effectively here for too long without UX impact,
-        // we will assume this is handled by a backend or use a simplified flow.
-        // However, per docs:
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2s
+        // Simple polling for demo purposes
+        let attempts = 0;
+        while (!operation.done && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
             operation = await ai.operations.getVideosOperation({ operation: operation });
+            attempts++;
         }
 
         const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
         if (videoUri) {
-             // Append API Key to fetch the actual bytes if needed, or just return URI for display if supported
-             // Note: Browser might not be able to fetch directly due to CORS.
-             // We will return the URI with the key appended for the frontend to try and use.
-             // Using process.env.API_KEY safely here as it's client side logic helper
              // @ts-ignore
              const key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
              return `${videoUri}&key=${key}`; 
@@ -183,38 +167,15 @@ export async function generateVideos(prompt: string): Promise<string | null> {
     }
 }
 
-export async function generateSpeech(text: string): Promise<string | null> {
-    const ai = getAiInstance();
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: text }] }],
-            config: {
-                responseModalities: [GeminiModality.AUDIO],
-                speechConfig: {
-                    voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: 'Kore' },
-                    },
-                },
-            },
-        });
-        return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
-    } catch (e) {
-        console.error("TTS Error:", e);
-        return null;
-    }
-}
-
-
 // --- Function Calling Schemas ---
 
 const queryPlatformDeclaration: GeminiFunctionDeclaration = {
     name: 'queryPlatform',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Answers user questions about their own data within the platform. Use for queries like "What should I focus on today?", "Summarize my open deals", or "Any overdue tasks for ABC Limited?". This is for reading and summarizing data, not for creating or updating items.',
+        description: 'Answers user questions about their own data within the platform.',
         properties: {
-            query: { type: GeminiType.STRING, description: 'The user\'s question about their platform data.' },
+            query: { type: GeminiType.STRING, description: 'The user\'s question.' },
         },
         required: ['query'],
     },
@@ -226,7 +187,7 @@ const findProspectsDeclaration: GeminiFunctionDeclaration = {
         type: GeminiType.OBJECT,
         description: 'Searches for potential new clients based on a business line\'s profile.',
         properties: {
-            businessLineName: { type: GeminiType.STRING, description: 'The name of the business line to find prospects for.' },
+            businessLineName: { type: GeminiType.STRING, description: 'The name of the business line.' },
         },
         required: ['businessLineName'],
     },
@@ -236,9 +197,9 @@ const analyzeRiskDeclaration: GeminiFunctionDeclaration = {
     name: 'analyzeRisk',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Performs a deep "Pre-Mortem" risk analysis on a specific project by searching for common pitfalls in similar industries.',
+        description: 'Performs a "Pre-Mortem" risk analysis on a project.',
         properties: {
-            projectName: { type: GeminiType.STRING, description: 'The name of the project to analyze.' },
+            projectName: { type: GeminiType.STRING, description: 'The name of the project.' },
         },
         required: ['projectName'],
     },
@@ -248,7 +209,7 @@ const analyzeNegotiationDeclaration: GeminiFunctionDeclaration = {
     name: 'analyzeNegotiation',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Acts as a Negotiation Coach. Researches the client and deal to suggest leverage points and strategies.',
+        description: 'Researches client financials/news to suggest negotiation strategies.',
         properties: {
             dealName: { type: GeminiType.STRING, description: 'The name of the deal.' },
         },
@@ -260,7 +221,7 @@ const getClientPulseDeclaration: GeminiFunctionDeclaration = {
     name: 'getClientPulse',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Searches the web for recent news and social media activity about a client to find conversation starters.',
+        description: 'Searches for recent news and social media activity about a client.',
         properties: {
             clientName: { type: GeminiType.STRING, description: 'The name of the client.' },
         },
@@ -272,68 +233,31 @@ const createCrmEntryDeclaration: GeminiFunctionDeclaration = {
   name: 'createCrmEntry',
   parameters: {
     type: GeminiType.OBJECT,
-    description: 'Logs a past interaction (like a call, email, or meeting) to a client\'s CRM timeline. Use this for events that have already happened. For future actions, use createBoardItem.',
+    description: 'Logs a past interaction (call, email, meeting) to CRM.',
     properties: {
-      interactionType: { 
-        type: GeminiType.STRING,
-        description: 'The type of interaction. Infer from the user\'s language. Must be one of: "call", "email", "meeting", "message", "note".'
-      },
-      content: { 
-        type: GeminiType.STRING,
-        description: 'The full details of the interaction as described by the user.'
-      },
-      clientName: { 
-        type: GeminiType.STRING,
-        description: 'The name of the client involved in the interaction.'
-      },
-      dealName: {
-        type: GeminiType.STRING,
-        description: 'Optional: The name of the deal this interaction is related to.'
-      },
+      interactionType: { type: GeminiType.STRING, description: 'One of: "call", "email", "meeting", "message", "note".' },
+      content: { type: GeminiType.STRING, description: 'Details of the interaction.' },
+      clientName: { type: GeminiType.STRING, description: 'Client name.' },
+      dealName: { type: GeminiType.STRING, description: 'Optional deal name.' },
     },
     required: ['interactionType', 'content', 'clientName'],
   },
 };
 
-
 const createBoardItemDeclaration: GeminiFunctionDeclaration = {
   name: 'createBoardItem',
   parameters: {
     type: GeminiType.OBJECT,
-    description: 'Creates a new item (task, reminder, or meeting) and adds it to the "To Do" column of the Kanban board, based on the user\'s voice command. Infer the item type from the user\'s phrasing, e.g., "remind me to..." implies a Reminder, "meeting with..." implies a Meeting, otherwise it is a Task.',
+    description: 'Creates a task, reminder, or meeting.',
     properties: {
-      itemType: {
-        type: GeminiType.STRING,
-        description: 'The type of item to create. Must be one of: "Task", "Reminder", "Meeting".',
-      },
-      title: {
-        type: GeminiType.STRING,
-        description: 'A short, human-friendly title for the item. E.g., for a task "Call James", for a reminder "Send the invoice", for a meeting "Project sync with the team".',
-      },
-      description: {
-        type: GeminiType.STRING,
-        description: 'Optional, longer description of the item from the user’s voice.',
-      },
-      dueDate: {
-        type: GeminiType.STRING,
-        description: 'The due date and time for the item in ISO 8601 format, parsed from what the user said (e.g., "tomorrow at 3pm").',
-      },
-      priority: {
-        type: GeminiType.STRING,
-        description: 'The priority of the item. Can be "Low", "Medium", or "High".',
-      },
-      clientName: {
-        type: GeminiType.STRING,
-        description: 'The name of the client this item is for. E.g., "ABC Limited".',
-      },
-      dealName: {
-        type: GeminiType.STRING,
-        description: 'The name of the deal this item is related to. E.g., "Warehouse monthly fumigation".',
-      },
-      businessLineName: {
-        type: GeminiType.STRING,
-        description: 'The name of the business line for this item. E.g., "Fumigation".',
-      },
+      itemType: { type: GeminiType.STRING, description: '"Task", "Reminder", "Meeting".' },
+      title: { type: GeminiType.STRING, description: 'Title of the item.' },
+      description: { type: GeminiType.STRING, description: 'Optional description.' },
+      dueDate: { type: GeminiType.STRING, description: 'ISO date/time.' },
+      priority: { type: GeminiType.STRING, description: '"Low", "Medium", "High".' },
+      clientName: { type: GeminiType.STRING, description: 'Client name.' },
+      dealName: { type: GeminiType.STRING, description: 'Deal name.' },
+      businessLineName: { type: GeminiType.STRING, description: 'Business Line name.' },
     },
     required: ['itemType', 'title'],
   },
@@ -343,16 +267,10 @@ const moveTaskDeclaration: GeminiFunctionDeclaration = {
     name: 'moveTask',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Moves an existing task to a different column on the Kanban board.',
+        description: 'Moves a task to a new status.',
         properties: {
-            taskTitle: {
-                type: GeminiType.STRING,
-                description: 'The title of the task to move. The model should try to match this to an existing task.',
-            },
-            newStatus: {
-                type: GeminiType.STRING,
-                description: 'The new status for the task. Must be one of: "To Do", "Doing", "Done", "Terminated".',
-            },
+            taskTitle: { type: GeminiType.STRING, description: 'Title of the task.' },
+            newStatus: { type: GeminiType.STRING, description: '"To Do", "Doing", "Done", "Terminated".' },
         },
         required: ['taskTitle', 'newStatus'],
     },
@@ -362,12 +280,12 @@ const createBusinessLineDeclaration: GeminiFunctionDeclaration = {
   name: 'createBusinessLine',
   parameters: {
     type: GeminiType.OBJECT,
-    description: 'Creates a new business line from user input, parsing out the key details.',
+    description: 'Creates a new business line.',
     properties: {
-      name: { type: GeminiType.STRING, description: 'The name of the new business line. Example: "Fumigation".' },
-      description: { type: GeminiType.STRING, description: 'A one-sentence description of what the business line does. Example: "We help apartments and offices get rid of pests."' },
-      customers: { type: GeminiType.STRING, description: 'A one-sentence description of the typical customers. Example: "Apartments, estates, and small offices in Nairobi."' },
-      aiFocus: { type: GeminiType.STRING, description: 'A one-sentence description of what the AI should focus on for this line. Example: "Find estate-wide contracts and upsell to annual plans."' },
+      name: { type: GeminiType.STRING },
+      description: { type: GeminiType.STRING },
+      customers: { type: GeminiType.STRING },
+      aiFocus: { type: GeminiType.STRING },
     },
     required: ['name', 'description', 'customers', 'aiFocus'],
   },
@@ -377,12 +295,12 @@ const createClientDeclaration: GeminiFunctionDeclaration = {
   name: 'createClient',
   parameters: {
     type: GeminiType.OBJECT,
-    description: 'Creates a new client and links it to a business line.',
+    description: 'Creates a new client.',
     properties: {
-      name: { type: GeminiType.STRING, description: 'The name of the new client. Example: "ABC Limited".' },
-      description: { type: GeminiType.STRING, description: 'A one-sentence description of who the client is. Example: "A large logistics company with multiple warehouses."' },
-      aiFocus: { type: GeminiType.STRING, description: 'A one-sentence description of what the AI should focus on for this client. Example: "Focus on securing a multi-year contract."' },
-      businessLineName: { type: GeminiType.STRING, description: 'Optional: The name of the business line to associate this client with. If omitted, a sensible default will be chosen.' },
+      name: { type: GeminiType.STRING },
+      description: { type: GeminiType.STRING },
+      aiFocus: { type: GeminiType.STRING },
+      businessLineName: { type: GeminiType.STRING },
     },
     required: ['name', 'description', 'aiFocus'],
   },
@@ -392,14 +310,14 @@ const createDealDeclaration: GeminiFunctionDeclaration = {
   name: 'createDeal',
   parameters: {
     type: GeminiType.OBJECT,
-    description: 'Creates a new deal and links it to an existing client.',
+    description: 'Creates a new deal.',
     properties: {
-      name: { type: GeminiType.STRING, description: 'The name of the new deal.' },
-      description: { type: GeminiType.STRING, description: 'A short, one-sentence description of what the deal is about.' },
-      clientName: { type: GeminiType.STRING, description: 'The name of the client this deal belongs to.' },
-      value: { type: GeminiType.NUMBER, description: 'The total monetary value of the deal.' },
-      currency: { type: GeminiType.STRING, description: 'The currency of the deal value (e.g., USD, KES).' },
-      revenueModel: { type: GeminiType.STRING, description: 'The revenue model for the deal. Must be one of: "Revenue Share", "Full Pay".' },
+      name: { type: GeminiType.STRING },
+      description: { type: GeminiType.STRING },
+      clientName: { type: GeminiType.STRING },
+      value: { type: GeminiType.NUMBER },
+      currency: { type: GeminiType.STRING },
+      revenueModel: { type: GeminiType.STRING },
     },
     required: ['name', 'description', 'clientName', 'value', 'currency', 'revenueModel'],
   },
@@ -409,15 +327,15 @@ const createProjectDeclaration: GeminiFunctionDeclaration = {
     name: 'createProject',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Parses a user\'s conversational input to create a new, structured project record. Fills as many fields as possible from the natural language input.',
+        description: 'Creates a new project.',
         properties: {
-            partnerName: { type: GeminiType.STRING, description: 'The name of the partner or organisation.' },
-            projectName: { type: GeminiType.STRING, description: 'The name of the project. Propose a clean name if not explicitly stated.' },
-            goal: { type: GeminiType.STRING, description: 'A one-line goal or "Why this matters".' },
-            dealType: { type: GeminiType.STRING, description: 'The type of deal. Must be one of: "Revenue Share", "Fee-based", "Grant", "In-kind".' },
-            expectedRevenue: { type: GeminiType.NUMBER, description: 'A rough number for expected revenue this year.' },
-            impactMetric: { type: GeminiType.STRING, description: 'The main impact metric, e.g., "# learners", "# SMEs".' },
-            stage: { type: GeminiType.STRING, description: 'The initial stage. Usually "Lead" or "In design".' },
+            partnerName: { type: GeminiType.STRING },
+            projectName: { type: GeminiType.STRING },
+            goal: { type: GeminiType.STRING },
+            dealType: { type: GeminiType.STRING },
+            expectedRevenue: { type: GeminiType.NUMBER },
+            impactMetric: { type: GeminiType.STRING },
+            stage: { type: GeminiType.STRING },
         },
         required: ['partnerName', 'projectName', 'goal'],
     },
@@ -427,11 +345,11 @@ const createEventDeclaration: GeminiFunctionDeclaration = {
     name: 'createEvent',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Creates a new Event record in the Events module. Use this when the user talks about planning an event, workshop, or webinar.',
+        description: 'Creates a new Event record.',
         properties: {
-            name: { type: GeminiType.STRING, description: 'The name of the event.' },
-            location: { type: GeminiType.STRING, description: 'Location or "Online".' },
-            date: { type: GeminiType.STRING, description: 'Date of the event.' },
+            name: { type: GeminiType.STRING },
+            location: { type: GeminiType.STRING },
+            date: { type: GeminiType.STRING },
         },
         required: ['name'],
     },
@@ -441,11 +359,11 @@ const createCandidateDeclaration: GeminiFunctionDeclaration = {
     name: 'createCandidate',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Adds a new candidate to the HR recruitment pipeline.',
+        description: 'Adds a new HR candidate.',
         properties: {
-            name: { type: GeminiType.STRING, description: 'Name of the candidate.' },
-            roleApplied: { type: GeminiType.STRING, description: 'The role they are applying for.' },
-            email: { type: GeminiType.STRING, description: 'Email address if available.' },
+            name: { type: GeminiType.STRING },
+            roleApplied: { type: GeminiType.STRING },
+            email: { type: GeminiType.STRING },
         },
         required: ['name', 'roleApplied'],
     },
@@ -455,12 +373,12 @@ const createSocialPostDeclaration: GeminiFunctionDeclaration = {
     name: 'createSocialPost',
     parameters: {
         type: GeminiType.OBJECT,
-        description: 'Drafts a social media post for the marketing calendar.',
+        description: 'Drafts a social media post.',
         properties: {
-            content: { type: GeminiType.STRING, description: 'The text caption for the post.' },
-            channel: { type: GeminiType.STRING, description: 'Platform (Instagram, LinkedIn, etc.).' },
-            visualPrompt: { type: GeminiType.STRING, description: 'Prompt for generating the visual asset.' },
-            date: { type: GeminiType.STRING, description: 'Scheduled date (YYYY-MM-DD).' }
+            content: { type: GeminiType.STRING },
+            channel: { type: GeminiType.STRING },
+            visualPrompt: { type: GeminiType.STRING },
+            date: { type: GeminiType.STRING }
         },
         required: ['content', 'channel'],
     },
@@ -470,10 +388,10 @@ const updateDealStatusDeclaration: GeminiFunctionDeclaration = {
     name: 'updateDealStatus',
     parameters: {
         type: GeminiType.OBJECT,
-        description: "Updates a deal's status to 'Open' or 'Closed - Won' or 'Closed - Lost'.",
+        description: "Updates a deal's status.",
         properties: {
-            dealName: { type: GeminiType.STRING, description: 'The name of the deal to update.' },
-            newStatus: { type: GeminiType.STRING, description: "The new status for the deal. Must be 'Open', 'Closed - Won', or 'Closed - Lost'." },
+            dealName: { type: GeminiType.STRING },
+            newStatus: { type: GeminiType.STRING },
         },
         required: ['dealName', 'newStatus'],
     },
@@ -483,18 +401,19 @@ const sendEmailDeclaration: GeminiFunctionDeclaration = {
     name: 'sendEmail',
     parameters: {
         type: GeminiType.OBJECT,
-        description: "Drafts an email to a recipient. This opens the user's default email client.",
+        description: "Drafts an email.",
         properties: {
-            recipientEmail: { type: GeminiType.STRING, description: 'The email address of the recipient.' },
-            subject: { type: GeminiType.STRING, description: 'The subject of the email.' },
-            body: { type: GeminiType.STRING, description: 'The body content of the email.' },
+            recipientEmail: { type: GeminiType.STRING },
+            subject: { type: GeminiType.STRING },
+            body: { type: GeminiType.STRING },
         },
         required: ['subject', 'body'],
     },
 };
 
+// --- Tools Export ---
 
-const assistantTools = [{ functionDeclarations: [
+export const assistantTools = [{ functionDeclarations: [
     createCrmEntryDeclaration,
     createBoardItemDeclaration, 
     moveTaskDeclaration,

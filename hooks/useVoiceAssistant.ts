@@ -28,6 +28,14 @@ interface UseVoiceAssistantProps {
   currentClientId?: string | null;
   currentDealId?: string | null;
   platformActivitySummary?: string;
+  
+  // Dynamic System Context Injection
+  systemContext?: {
+      clients: string[];
+      deals: string[];
+      businessLines: string[];
+      projects: string[];
+  };
 }
 
 export const useVoiceAssistant = ({ 
@@ -49,6 +57,7 @@ export const useVoiceAssistant = ({
   onAnalyzeNegotiation,
   onGetClientPulse,
   currentDealId,
+  systemContext = { clients: [], deals: [], businessLines: [], projects: [] },
 }: UseVoiceAssistantProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -139,9 +148,9 @@ export const useVoiceAssistant = ({
                 case 'findProspects': if(onFindProspects) result = onFindProspects(finalArgs as any); break;
                 case 'queryPlatform': if(onPlatformQuery) result = onPlatformQuery(finalArgs.query as string); break;
                 case 'sendEmail': window.location.href = `mailto:${finalArgs.recipientEmail}?subject=${encodeURIComponent(finalArgs.subject)}&body=${encodeURIComponent(finalArgs.body)}`; result = "Opening email..."; break;
-                case 'analyzeRisk': if(onAnalyzeRisk) result = onAnalyzeRisk(finalArgs as any); else result = "Risk analysis not available here."; break;
-                case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available here."; break;
-                case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available here."; break;
+                case 'analyzeRisk': if(onAnalyzeRisk) result = onAnalyzeRisk(finalArgs as any); else result = "Risk analysis not available."; break;
+                case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available."; break;
+                case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available."; break;
                 default: result = `Tool ${fc.name} not found.`;
             }
         } catch (e) {
@@ -209,30 +218,39 @@ export const useVoiceAssistant = ({
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         nextStartTimeRef.current = 0;
         
+        // Inject Live Context
+        const contextStr = `
+**CURRENT BUSINESS CONTEXT (INTERNAL DATA):**
+- Business Lines: ${systemContext.businessLines.join(', ') || "None"}
+- Clients: ${systemContext.clients.join(', ') || "None"}
+- Deals: ${systemContext.deals.join(', ') || "None"}
+- Projects: ${systemContext.projects.join(', ') || "None"}
+`;
+
         const systemInstruction = `
 # 🚨 SYSTEM OVERRIDE: AI — AUTONOMOUS PROTOCOL RESET
 
 **STATUS:** CRITICAL HARD REBOOT  
-**COMMAND:** You are **AI**, the super-intelligent, autonomous worker at the heart of OlooAI. You are not a chatbot; you are a proactive agent.
+**COMMAND:** You are **AI**, the super-intelligent, autonomous worker at the heart of OlooAI.
 
-**1. THE CORE PHILOSOPHY:**
-* **AI-First Mandate:** Synthesize LLM + Internal Data + Internet to solve problems.
-* **Sensitivity:** Treat "Maybe we should look at X" as a COMMAND to research X.
+${contextStr}
 
-**2. INTELLIGENCE MODES & PERSONAS:**
-* **MODE A (Router):** "Onboard Client X" -> Create Client + Deal + Tasks. Cascade actions.
+**1. CORE MANDATE:**
+* **3-Brain Synthesis:** Use LLM + Internal Context (above) + Internet (Tools) for every task.
+* **Sensitivity:** "Maybe we should look at X" = COMMAND to research X.
+
+**2. EXECUTION MODES:**
+* **Router (God Mode):** "Onboard Client X" -> Create Client + Deal + Tasks. Cascade actions.
 * **Sales Autopilot:** Monitor pipeline, suggest plays.
 * **Executive Strategist:** Direct meetings, capture commitments.
 
-**3. AUTONOMOUS EXECUTION & INFERENCE:**
-*   **Tool Use:** Call tools immediately. Do not wait for permission.
-*   **Inference Protocol:** If a required field (e.g. Business Line) is missing, INFER it from context or use a sensible default. DO NOT STOP.
-*   **Relationships:** Enforce Client -> Business Line, Deal -> Client.
-*   **Fallback:** If a tool fails, explain why and provide the manual text/output so the user isn't left stranded.
+**3. AUTONOMOUS INFERENCE & FALLBACK:**
+*   **Call Tools Immediately.** Do not wait for permission.
+*   **Inference Protocol:** If Business Line is missing, INFER it. If Client is missing, CREATE it first.
+*   **Fallback:** If a tool fails, explain why and provide the manual text/output.
 
 **FINAL INSTRUCTION:**
 **AI PROTOCOL ACTIVE.**
-**INTELLIGENCE UNRESTRICTED.**
 **START WORKING.**
 `;
 

@@ -120,12 +120,13 @@ export const useKanban = () => {
   };
 
 
-  // --- CRUD ACTIONS ---
+  // --- CRUD ACTIONS WITH FALLBACK LOGIC ---
 
   const addTask = useCallback(async (itemData: Partial<Task> & { itemType?: TaskType, title: string, businessLineName?: string }) => {
     if (!orgId) return "No organization found";
     
     let businessLineId = itemData.businessLineId;
+    
     // Inference logic
     if (!businessLineId && itemData.businessLineName) {
         const businessLine = businessLines.find(bl => bl.name.toLowerCase() === itemData.businessLineName?.toLowerCase());
@@ -181,9 +182,7 @@ export const useKanban = () => {
           if (!businessLineId) businessLineId = businessLines[0].id;
       }
       
-      // If strict enforcement fails, we proceed with the first BL found (V1.2 Logic: Keep Walter working)
-      if (!businessLineId && businessLines.length > 0) businessLineId = businessLines[0].id; 
-      // If ABSOLUTELY no business lines exist, maybe create a default one? For now, return null.
+      // Fallback: If still missing, create a "General" Business Line automatically
       if (!businessLineId) {
           const { data: defaultBL } = await supabase.from('business_lines').insert({
               organization_id: orgId,
@@ -246,12 +245,11 @@ export const useKanban = () => {
           clientId = client?.id;
       }
       
-      // Auto-Create Client if missing
+      // Auto-Create Client if missing (Action Cascading)
       if (!clientId && data.clientName) {
-          // Recursively create client if not found
           const newClient = await addClient({
               name: data.clientName,
-              description: 'Auto-created by Walter',
+              description: 'Auto-created by Walter for Deal',
               aiFocus: 'General',
               businessLineId: businessLines.length > 0 ? businessLines[0].id : undefined
           });
@@ -283,7 +281,7 @@ export const useKanban = () => {
       const { data: inserted, error } = await supabase.from('deals').insert(payload).select().single();
       if (!error && inserted) {
           setDeals(prev => [inserted as Deal, ...prev]);
-          return inserted; // Return full object for chaining
+          return inserted; 
       }
       return "Failed to create deal.";
   }, [orgId, clients, addClient, businessLines]);
@@ -320,7 +318,7 @@ export const useKanban = () => {
       const { data: inserted, error } = await supabase.from('projects').insert(payload).select().single();
       if (!error && inserted) {
           setProjects(prev => [inserted as Project, ...prev]);
-          return inserted; // Return object for chaining
+          return inserted;
       }
       return "Failed to create project.";
   }, [orgId, clients, addClient, businessLines]);
@@ -345,12 +343,14 @@ export const useKanban = () => {
   }, [orgId]);
 
   const addEvent = useCallback(async (data: Partial<Event>) => {
-      if (!orgId) return;
-      // Inference logic for events: Default to first BL if not provided
-      const businessLineId = businessLines.length > 0 ? businessLines[0].id : null;
+      if (!orgId) return "Error";
       const payload = { ...data, organization_id: orgId, status: 'Planning', checklist: [] };
       const { data: inserted, error } = await supabase.from('events').insert(payload).select().single();
-      if (!error && inserted) setEvents(prev => [inserted, ...prev]);
+      if (!error && inserted) {
+          setEvents(prev => [inserted, ...prev]);
+          return "Event created.";
+      }
+      return "Failed.";
   }, [orgId, businessLines]);
 
   const updateEvent = useCallback(async (id: string, data: Partial<Event>) => {
@@ -359,10 +359,14 @@ export const useKanban = () => {
   }, []);
 
   const addCandidate = useCallback(async (data: Partial<HRCandidate>) => {
-      if (!orgId) return;
+      if (!orgId) return "Error";
       const payload = { ...data, organization_id: orgId, status: 'Applied' };
       const { data: inserted, error } = await supabase.from('hr_candidates').insert(payload).select().single();
-      if (!error && inserted) setCandidates(prev => [inserted, ...prev]);
+      if (!error && inserted) {
+          setCandidates(prev => [inserted, ...prev]);
+          return "Candidate added.";
+      }
+      return "Failed.";
   }, [orgId]);
 
   const updateCandidate = useCallback(async (id: string, data: Partial<HRCandidate>) => {
@@ -597,7 +601,7 @@ export const useKanban = () => {
 
   }, [clients, deals, businessLines, teamMembers, projects, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate, addSocialPost]);
 
-  // --- DEEP INTELLIGENCE & HELPERS (Keep existing implementations) ---
+  // --- DEEP INTELLIGENCE & HELPERS ---
   
   const generateLeadScore = async (client: Client) => {
       if(!orgId) return;
@@ -638,8 +642,6 @@ export const useKanban = () => {
       const client = clients.find(c => c.id === id);
       if(client) {
           await updateClient(id, {
-              lastTouchSummary: client.proposedLastTouchSummary, // Assuming this field exists or mapping to description update
-              // Actual fields depend on schema, here we assume proposed fields are what we want to keep or move
               proposedLastTouchSummary: null, proposedNextAction: null, proposedNextActionDueDate: null
           } as any);
       }

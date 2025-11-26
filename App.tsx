@@ -196,6 +196,13 @@ export default function App() {
     currentClientId: selectedClientId,
     currentDealId: selectedDealId,
     platformActivitySummary,
+    // Inject Live System Context
+    systemContext: {
+        clients: kanban.clients.map(c => c.name),
+        deals: kanban.deals.map(d => d.name),
+        businessLines: kanban.businessLines.map(b => b.name),
+        projects: kanban.projects.map(p => p.projectName),
+    }
   });
 
   const clearSelections = () => {
