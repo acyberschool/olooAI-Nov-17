@@ -120,7 +120,7 @@ export const useKanban = () => {
   };
 
 
-  // --- CRUD ACTIONS WITH FALLBACK LOGIC ---
+  // --- CRUD ACTIONS WITH FALLBACK LOGIC & ERROR SURFACING ---
 
   const addTask = useCallback(async (itemData: Partial<Task> & { itemType?: TaskType, title: string, businessLineName?: string }) => {
     if (!orgId) return "No organization found";
@@ -137,9 +137,6 @@ export const useKanban = () => {
         if (client) businessLineId = client.businessLineId;
     }
     
-    // Default Logic: If no Business Line is attached, it implies "Personal" task.
-    // We store null for businessLineId to represent "Personal".
-
     const payload = {
         title: itemData.title,
         description: itemData.description,
@@ -159,22 +156,23 @@ export const useKanban = () => {
 
     const { data: inserted, error } = await supabase.from('tasks').insert(payload).select().single();
 
-    if (error) { console.error('Error creating task:', error); return `Error creating task.`; }
+    if (error) { 
+        console.error('Error creating task:', error); 
+        return `Error creating task: ${error.message}`; 
+    }
 
     if (inserted) {
         setTasks(prev => [inserted as Task, ...prev]);
         return `${inserted.type} "${inserted.title}" created.`;
     }
-    return "Failed.";
+    return "Failed to create task.";
   }, [orgId, businessLines, clients]);
 
   const addClient = useCallback(async (data: any) => {
       if (!orgId) return null;
       
-      // LOGIC: Client MUST be attached to a Business Line.
       let businessLineId = data.businessLineId;
       if (!businessLineId && businessLines.length > 0) {
-          // Attempt inference or default
           if (data.businessLineName) {
                const bl = businessLines.find(b => b.name.toLowerCase() === data.businessLineName.toLowerCase());
                if (bl) businessLineId = bl.id;
@@ -182,7 +180,6 @@ export const useKanban = () => {
           if (!businessLineId) businessLineId = businessLines[0].id;
       }
       
-      // Fallback: If still missing, create a "General" Business Line automatically
       if (!businessLineId) {
           const { data: defaultBL } = await supabase.from('business_lines').insert({
               organization_id: orgId,
@@ -201,7 +198,13 @@ export const useKanban = () => {
 
       const payload = { ...data, businessLineId, organization_id: orgId };
       const { data: inserted, error } = await supabase.from('clients').insert(payload).select().single();
-      if (!error && inserted) {
+      
+      if (error) {
+          console.error("Error creating client:", error);
+          return null; // Or handle error display
+      }
+
+      if (inserted) {
           setClients(prev => [inserted as Client, ...prev]);
           return inserted as Client;
       }
@@ -231,21 +234,18 @@ export const useKanban = () => {
           setBusinessLines(prev => [inserted as BusinessLine, ...prev]);
           return `Business Line ${inserted.name} created.`;
       }
-      return "Failed to create business line.";
+      return `Failed to create business line: ${error?.message}`;
   }, [orgId]);
 
   const addDeal = useCallback(async (data: any) => {
       if (!orgId) return "Error";
       
-      // LOGIC: Deal MUST be attached to a Client.
       let clientId = data.clientId;
-      // Inference
       if (!clientId && data.clientName) {
           const client = clients.find(c => c.name.toLowerCase() === data.clientName.toLowerCase());
           clientId = client?.id;
       }
       
-      // Auto-Create Client if missing (Action Cascading)
       if (!clientId && data.clientName) {
           const newClient = await addClient({
               name: data.clientName,
@@ -283,20 +283,18 @@ export const useKanban = () => {
           setDeals(prev => [inserted as Deal, ...prev]);
           return inserted; 
       }
-      return "Failed to create deal.";
+      return `Failed to create deal: ${error?.message}`;
   }, [orgId, clients, addClient, businessLines]);
 
   const addProject = useCallback(async (data: any) => {
       if (!orgId) return "Error";
       
-      // LOGIC: Project MUST be attached to a Client.
       let clientId = data.clientId;
       if (!clientId && data.partnerName) {
            const client = clients.find(c => c.name.toLowerCase().includes(data.partnerName.toLowerCase()));
            clientId = client?.id;
       }
       
-      // Auto-create client for project if needed
       if (!clientId && data.partnerName) {
           const newClient = await addClient({
               name: data.partnerName,
@@ -320,7 +318,7 @@ export const useKanban = () => {
           setProjects(prev => [inserted as Project, ...prev]);
           return inserted;
       }
-      return "Failed to create project.";
+      return `Failed to create project: ${error?.message}`;
   }, [orgId, clients, addClient, businessLines]);
 
   const addCRMEntry = useCallback(async (entry: any) => {
@@ -350,7 +348,7 @@ export const useKanban = () => {
           setEvents(prev => [inserted, ...prev]);
           return "Event created.";
       }
-      return "Failed.";
+      return `Failed: ${error?.message}`;
   }, [orgId, businessLines]);
 
   const updateEvent = useCallback(async (id: string, data: Partial<Event>) => {
@@ -366,7 +364,7 @@ export const useKanban = () => {
           setCandidates(prev => [inserted, ...prev]);
           return "Candidate added.";
       }
-      return "Failed.";
+      return `Failed: ${error?.message}`;
   }, [orgId]);
 
   const updateCandidate = useCallback(async (id: string, data: Partial<HRCandidate>) => {
@@ -449,19 +447,24 @@ export const useKanban = () => {
   }, [orgId]);
 
   const addSocialPost = useCallback(async (data: any) => {
-      if (!orgId) return "Error";
-      // Inference: Default to first Business Line if missing
+      if (!orgId) return null;
       const blId = data.business_line_id || (businessLines.length > 0 ? businessLines[0].id : null);
       
-      const { data: inserted } = await supabase.from('social_posts').insert({...data, organization_id: orgId, business_line_id: blId}).select().single();
+      const { data: inserted, error } = await supabase.from('social_posts').insert({...data, organization_id: orgId, business_line_id: blId}).select().single();
       if (inserted) {
           setSocialPosts(prev => [inserted as SocialPost, ...prev]);
-          return "Post created";
+          return inserted as SocialPost;
       }
-      return "Failed";
+      console.error("Failed to create post:", error?.message);
+      return null;
   }, [orgId, businessLines]);
 
-  // --- AI DISPATCHER ---
+  const updateSocialPost = useCallback(async (id: string, data: any) => { 
+      await supabase.from('social_posts').update(data).eq('id', id); 
+      setSocialPosts(prev => prev.map(p => p.id === id ? {...p, ...data} : p)); 
+  }, []);
+
+  // --- AI DISPATCHER (REBUILT for FUNCTION CALLING) ---
   
   const processTextAndExecute = useCallback(async (text: string, context: UniversalInputContext, file?: any) => {
       const result = await processTextMessage(text, { 
@@ -472,134 +475,91 @@ export const useKanban = () => {
           projects: projects.map(p => p.projectName)
       }, context, "User is active", file);
 
-      let createdClientId: string | undefined = undefined;
-      let createdDealId: string | undefined = undefined;
-      let createdProjectId: string | undefined = undefined;
-
-      if (result.action === 'create_business_line' && result.businessLine) {
-          await addBusinessLine(result.businessLine);
-      }
-
-      if (result.action === 'create_client' && result.client) {
-           let blId = context.businessLineId;
-           if (result.client.businessLineName) {
-               const bl = businessLines.find(b => b.name.toLowerCase() === result.client!.businessLineName!.toLowerCase());
-               if (bl) blId = bl.id;
-           }
-           // Inference
-           if (!blId && businessLines.length > 0) blId = businessLines[0].id;
-           if (blId) {
-               const newClient = await addClient({
-                   name: result.client.name,
-                   description: result.client.description,
-                   aiFocus: result.client.aiFocus,
-                   businessLineId: blId
-               });
-               if (newClient) createdClientId = newClient.id;
-           }
-      }
-      
-      if (result.action === 'create_deal' && result.deal) {
-          const newDeal = await addDeal({
-              name: result.deal.name,
-              description: result.deal.description,
-              clientName: result.deal.clientName,
-              value: result.deal.value,
-              currency: result.deal.currency,
-              revenueModel: result.deal.revenueModel
-          }) as Deal | string;
+      if (result.functionCalls.length > 0) {
+          console.log("🛠️ Executing Tools:", result.functionCalls);
           
-          if (typeof newDeal !== 'string' && newDeal.id) {
-              createdDealId = newDeal.id;
-              createdClientId = newDeal.clientId; // Capture inferred client ID
-          }
-      }
+          // Dynamic Context Injection for Chaining
+          let lastCreatedClientId: string | undefined;
+          let lastCreatedDealId: string | undefined;
+          let lastCreatedProjectId: string | undefined;
 
-      if (result.action === 'create_project' && result.project) {
-          const newProject = await addProject(result.project) as Project | string;
-          if (typeof newProject !== 'string' && newProject.id) {
-              createdProjectId = newProject.id;
-              createdClientId = newProject.clientId;
-          }
-      }
+          for (const call of result.functionCalls) {
+              try {
+                  const args = call.args as any;
+                  
+                  // --- Chaining Logic ---
+                  if (!args.clientId && lastCreatedClientId) args.clientId = lastCreatedClientId;
+                  if (!args.dealId && lastCreatedDealId) args.dealId = lastCreatedDealId;
+                  if (!args.projectId && lastCreatedProjectId) args.projectId = lastCreatedProjectId;
 
-      if (result.action === 'create_event' && result.event) {
-          await addEvent(result.event);
-      }
-
-      if (result.action === 'create_candidate' && result.candidate) {
-          await addCandidate({
-              name: result.candidate.name,
-              roleApplied: result.candidate.roleApplied,
-              email: result.candidate.email || 'pending@email.com'
-          });
-      }
-      
-      if (result.action === 'create_social_post' && result.socialPost) {
-          await addSocialPost({
-              content: result.socialPost.content,
-              channel: result.socialPost.channel,
-              image_prompt: result.socialPost.visualPrompt,
-              date: result.socialPost.date || new Date().toISOString().split('T')[0],
-              business_line_id: businessLines.length > 0 ? businessLines[0].id : null,
-              type: 'Post',
-              status: 'Scheduled'
-          });
-      }
-
-      if (result.tasks && result.tasks.length > 0) {
-          result.tasks.forEach(t => {
-              let assigneeId = undefined;
-              if (t.assignee_name) {
-                  const member = teamMembers.find(m => m.name.toLowerCase().includes(t.assignee_name!.toLowerCase()));
-                  if (member) assigneeId = member.id;
+                  switch (call.name) {
+                      case 'createBusinessLine':
+                          await addBusinessLine(args);
+                          break;
+                      case 'createClient':
+                          const newClient = await addClient(args);
+                          if (newClient) lastCreatedClientId = newClient.id;
+                          break;
+                      case 'createDeal':
+                          // addDeal handles internal client creation if needed, but for chaining we track the ID
+                          const newDeal = await addDeal(args);
+                          if (newDeal && typeof newDeal !== 'string') {
+                              lastCreatedDealId = newDeal.id;
+                              lastCreatedClientId = newDeal.clientId;
+                          }
+                          break;
+                      case 'createProject':
+                          const newProject = await addProject(args);
+                          if (newProject && typeof newProject !== 'string') {
+                              lastCreatedProjectId = newProject.id;
+                              lastCreatedClientId = newProject.clientId;
+                          }
+                          break;
+                      case 'createBoardItem': // Tasks
+                          // Inject defaults if missing
+                          if (!args.businessLineId && !args.clientId && !args.dealId && !args.projectId) {
+                               if (lastCreatedDealId) args.dealId = lastCreatedDealId;
+                               else if (lastCreatedProjectId) args.projectId = lastCreatedProjectId;
+                               else if (lastCreatedClientId) args.clientId = lastCreatedClientId;
+                          }
+                          await addTask(args);
+                          break;
+                      case 'createSocialPost':
+                          const newPost = await addSocialPost(args);
+                          if (newPost && args.visualPrompt) {
+                              // Generate image in background and auto-attach to the new post
+                              generateImages(args.visualPrompt).then(async (imageUrl) => {
+                                  if (imageUrl) {
+                                      await updateSocialPost(newPost.id, { imageUrl });
+                                  }
+                              });
+                          }
+                          break;
+                      case 'createEvent':
+                          await addEvent(args);
+                          break;
+                      case 'createCandidate':
+                          await addCandidate(args);
+                          break;
+                      case 'createCrmEntry':
+                          // Link to recent context
+                          if (!args.clientId && lastCreatedClientId) args.clientId = lastCreatedClientId;
+                          if (!args.dealId && lastCreatedDealId) args.dealId = lastCreatedDealId;
+                          await addCRMEntry(args);
+                          break;
+                      default:
+                          console.warn(`Tool ${call.name} not handled in Text Router.`);
+                  }
+              } catch (err) {
+                  console.error(`Error executing ${call.name}:`, err);
               }
-              
-              // Dynamic ID Resolution for Chained Actions
-              let targetClientId = t.client_name ? clients.find(c => c.name === t.client_name)?.id : context.clientId;
-              if (!targetClientId && createdClientId) targetClientId = createdClientId;
-
-              let targetDealId = t.deal_name ? deals.find(d => d.name === t.deal_name)?.id : context.dealId;
-              if (!targetDealId && createdDealId) targetDealId = createdDealId;
-
-              let targetProjectId = undefined;
-              if (createdProjectId) targetProjectId = createdProjectId;
-
-              addTask({ 
-                  title: t.title, 
-                  dueDate: t.due_date || undefined,
-                  priority: t.priority || 'Medium',
-                  assigneeId: assigneeId,
-                  businessLineName: t.business_line_name || undefined,
-                  clientId: targetClientId,
-                  dealId: targetDealId,
-                  projectId: targetProjectId
-              });
-          });
-      }
-      
-      if (result.note || result.action === 'create_note') {
-           const noteContent = result.note?.text || text;
-           const channel = result.note?.channel || 'note';
-           let clientId = context.clientId;
-           if (!clientId && result.client?.name) {
-               const c = clients.find(cl => cl.name.toLowerCase() === result.client?.name?.toLowerCase());
-               clientId = c?.id;
-           }
-           if (!clientId && createdClientId) clientId = createdClientId; // Use new client
-
-           if (clientId) {
-               addCRMEntry({
-                   clientId,
-                   summary: noteContent,
-                   type: channel as CRMEntryType,
-                   rawContent: text,
-                   dealId: context.dealId || createdDealId
-               });
-           }
+          }
       }
 
-  }, [clients, deals, businessLines, teamMembers, projects, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate, addSocialPost]);
+      // Return the text response from the model
+      return result.text;
+
+  }, [clients, deals, businessLines, teamMembers, projects, addTask, addClient, addCRMEntry, addDeal, addBusinessLine, addProject, addEvent, addCandidate, addSocialPost, updateSocialPost]);
 
   // --- DEEP INTELLIGENCE & HELPERS ---
   
@@ -751,7 +711,7 @@ export const useKanban = () => {
       addDocument, deleteDocument: async (id: string) => { await supabase.from('documents').delete().eq('id', id); setDocuments(prev => prev.filter(d => d.id !== id)); },
       addContact: async (data: any) => { if(!orgId) return "Error"; const {data: inserted} = await supabase.from('contacts').insert({...data, organization_id: orgId}).select().single(); if(inserted) { setContacts(prev => [inserted, ...prev]); return "Added"; } return "Failed"; },
       deleteContact: async (id: string) => { await supabase.from('contacts').delete().eq('id', id); setContacts(prev => prev.filter(c => c.id !== id)); },
-      addSocialPost, updateSocialPost: async (id: string, data: any) => { await supabase.from('social_posts').update(data).eq('id', id); setSocialPosts(prev => prev.map(p => p.id === id ? {...p, ...data} : p)); },
+      addSocialPost, updateSocialPost,
       generateSocialCalendarFromChat: async (bl: BusinessLine, chat: string) => {
           const prompt = `Social calendar for ${bl.name}. Goal: ${chat}. Return JSON: { posts: [{ date, content, type, imagePrompt, channel, cta, engagementHook }] }`;
           const schema = { type: GeminiType.OBJECT, properties: { posts: { type: GeminiType.ARRAY, items: { type: GeminiType.OBJECT, properties: { date: { type: GeminiType.STRING }, content: { type: GeminiType.STRING }, type: { type: GeminiType.STRING }, imagePrompt: { type: GeminiType.STRING }, channel: { type: GeminiType.STRING }, cta: { type: GeminiType.STRING }, engagementHook: { type: GeminiType.STRING } } } } } };
