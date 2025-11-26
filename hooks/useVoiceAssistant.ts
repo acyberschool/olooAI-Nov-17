@@ -7,7 +7,7 @@ type LiveSession = Awaited<ReturnType<typeof connectToLiveSession>>;
 
 interface UseVoiceAssistantProps {
   onBoardItemCreate: (itemData: Partial<Task>) => string | Promise<string>;
-  onCrmEntryCreate: (data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => string;
+  onCrmEntryCreate: (data: { interactionType: CRMEntryType, content: string, clientName?: string, dealName?: string }) => string | Promise<string>;
   onTaskUpdate: (taskTitle: string, newStatus: KanbanStatus) => string | Promise<string>;
   onBusinessLineCreate: (data: Omit<BusinessLine, 'id'>) => Promise<string> | string;
   onClientCreate: (data: Omit<Client, 'id' | 'businessLineId'> & { businessLineId?: string, businessLineName?: string; }) => Promise<string> | string;
@@ -23,6 +23,7 @@ interface UseVoiceAssistantProps {
   onAnalyzeRisk?: (data: { projectName: string }) => Promise<string>;
   onAnalyzeNegotiation?: (data: { dealName: string }) => Promise<string>;
   onGetClientPulse?: (data: { clientName: string }) => Promise<string>;
+  onGetCompetitorInsights?: (data: { businessLineName: string }) => Promise<string>;
   
   currentBusinessLineId?: string | null;
   currentClientId?: string | null;
@@ -56,6 +57,7 @@ export const useVoiceAssistant = ({
   onAnalyzeRisk,
   onAnalyzeNegotiation,
   onGetClientPulse,
+  onGetCompetitorInsights,
   currentDealId,
   systemContext = { clients: [], deals: [], businessLines: [], projects: [] },
 }: UseVoiceAssistantProps) => {
@@ -151,6 +153,7 @@ export const useVoiceAssistant = ({
                 case 'analyzeRisk': if(onAnalyzeRisk) result = onAnalyzeRisk(finalArgs as any); else result = "Risk analysis not available."; break;
                 case 'analyzeNegotiation': if(onAnalyzeNegotiation) result = onAnalyzeNegotiation(finalArgs as any); else result = "Negotiation analysis not available."; break;
                 case 'getClientPulse': if(onGetClientPulse) result = onGetClientPulse(finalArgs as any); else result = "Client pulse not available."; break;
+                case 'getCompetitorInsights': if(onGetCompetitorInsights) result = onGetCompetitorInsights(finalArgs as any); else result = "Competitor insights not available."; break;
                 default: result = `Tool ${fc.name} not found.`;
             }
         } catch (e) {

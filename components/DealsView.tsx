@@ -9,7 +9,7 @@ interface DealsViewProps {
   businessLines: BusinessLine[];
   onSelectDeal: (id: string) => void;
   onOpenUniversalInput: (context: UniversalInputContext) => void;
-  onUpdateDeal: (id: string, data: Partial<Omit<Deal, 'id'>>) => Promise<string> | string;
+  onUpdateDeal: (id: string, data: Partial<Omit<Deal, 'id'>>) => Promise<string> | string | void;
 }
 
 const PlusIcon = () => (

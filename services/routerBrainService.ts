@@ -15,12 +15,14 @@ const getSystemPrompt = (knownData: any, context: any) => `
 **SYSTEM CONTEXT:**
 - Business Lines: ${knownData.businessLines.join(', ')}
 - Clients: ${knownData.clients.join(', ')}
+- Team Members: ${knownData.teamMembers.join(', ')}
 - Active Context: ${JSON.stringify(context)}
 
 **MANDATE:**
 1. **ACT:** Do not just chat. Use the provided **TOOLS** to modify the database.
 2. **INFER:** If a Client creation is requested without a Business Line, infer it or use a default. If a Deal is requested without a Client, create the Client first.
 3. **CASCADE:** When creating a project/deal, create dependent tasks immediately.
+4. **ATC:** If a task description mentions "@Name", extract that name into the 'assigneeName' field.
 
 **OUTPUT:**
 - If you need to perform actions, emit **TOOL CALLS**.

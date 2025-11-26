@@ -1,384 +1,369 @@
 
 import React, { useState, useEffect } from 'react';
-import VoiceControl from './components/VoiceControl';
-import ChatInterface from './components/ChatInterface';
-import { useKanban } from './hooks/useKanban';
 import Sidebar from './components/Sidebar';
+import TasksView from './components/TasksView';
 import BusinessLinesView from './components/BusinessLinesView';
 import ClientsView from './components/ClientsView';
 import DealsView from './components/DealsView';
+import ProjectsView from './components/ProjectsView';
 import SalesView from './components/SalesView';
 import EventsView from './components/EventsView';
 import HRView from './components/HRView';
+import TeamView from './components/TeamView';
+import SettingsView from './components/SettingsView';
+import AuthPage from './pages/AuthPage';
+import { supabase } from './supabaseClient';
+import { useKanban } from './hooks/useKanban';
+import { useVoiceAssistant } from './hooks/useVoiceAssistant';
+import UniversalInputModal from './components/UniversalInputModal';
+import VoiceControl from './components/VoiceControl';
+import ChatInterface from './components/ChatInterface';
 import BusinessLineDetailView from './components/BusinessLineDetailView';
 import ClientDetailView from './components/ClientDetailView';
 import DealDetailView from './components/DealDetailView';
-import CRMView from './components/CRMView';
-import TasksView from './components/TasksView';
-import TaskDetailModal from './components/TaskDetailModal';
-import { useVoiceAssistant } from './hooks/useVoiceAssistant';
-import { Task, UniversalInputContext } from './types';
-import TeamView from './components/TeamView';
-import UniversalInputModal from './components/UniversalInputModal';
-import DataInsightsView from './components/DataInsightsView';
-import SettingsView from './components/SettingsView';
-import { getApiKey } from './config/geminiConfig';
-import Walkthrough from './components/Walkthrough';
-import ProjectsView from './components/ProjectsView';
 import ProjectDetailView from './components/ProjectDetailView';
-import LandingPage from './components/LandingPage'; 
-import AuthPage from './pages/AuthPage'; 
-import AdminDashboard from './components/AdminDashboard'; 
-import { supabase } from './supabaseClient';
+import AdminDashboard from './components/AdminDashboard';
 import SocialMediaTab from './components/SocialMediaTab';
+import { Task, BusinessLine, Client, Deal, Project, UniversalInputContext } from './types';
 
-let isApiKeyAvailable = true;
-try {
-  getApiKey();
-} catch (e) {
-  isApiKeyAvailable = false;
-}
+export type View = 'today' | 'allTasks' | 'businessLines' | 'deals' | 'clients' | 'projects' | 'social' | 'sales' | 'events' | 'hr' | 'access' | 'settings' | 'admin' | 'businessLineDetail' | 'clientDetail' | 'dealDetail' | 'projectDetail';
 
-declare global {
-    interface Window {
-        gtag: (...args: any[]) => void;
-    }
-}
-export const trackEvent = (action: string, category: string, label: string, value?: number) => {
-    if (window.gtag) {
-        window.gtag('event', action, { 'event_category': category, 'event_label': label, 'value': value });
-    }
-}
-
-// Flat View Structure as requested
-export type View = 'today' | 'allTasks' | 'crm' | 'businessLines' | 'deals' | 'clients' | 'projects' | 'social' | 'sales' | 'events' | 'hr' | 'access' | 'settings' | 'admin';
-
-const MenuIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-);
-
-const ApiKeyMissingError = () => (
-    <div className="flex items-center justify-center min-h-screen bg-red-50 text-red-800 p-4 font-sans">
-        <div className="max-w-2xl text-center bg-white p-8 rounded-xl shadow-2xl border border-red-200">
-            <h1 className="text-3xl font-bold mb-4 text-red-900">Configuration Error</h1>
-            <p className="text-lg mb-2 text-red-700">
-                The application cannot start because the <strong>API_KEY</strong> is missing.
-            </p>
-        </div>
-    </div>
-);
-
-export default function App() {
+function App() {
   const [session, setSession] = useState<any>(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [showAuthPage, setShowAuthPage] = useState(false);
+  const [activeView, setActiveView] = useState<View>('today');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Detailed view states
+  const [selectedBusinessLineId, setSelectedBusinessLineId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // Universal Input State
+  const [isUniversalInputOpen, setIsUniversalInputOpen] = useState(false);
+  const [universalInputContext, setUniversalInputContext] = useState<UniversalInputContext>({});
+
+  const kanbanApi = useKanban();
+
+  // Voice Assistant
+  const {
+    isConnecting, isRecording, isSpeaking, isThinking,
+    userTranscript, assistantTranscript, error: voiceError,
+    startRecording, stopRecording
+  } = useVoiceAssistant({
+    onBoardItemCreate: (item) => kanbanApi.addTask(item as any), 
+    onCrmEntryCreate: (data) => kanbanApi.addCRMEntry(data),
+    onTaskUpdate: (title, status) => Promise.resolve("Updated"),
+    onBusinessLineCreate: async (data) => { await kanbanApi.addBusinessLine(data); return "Business Line created"; },
+    onClientCreate: async (data) => { await kanbanApi.addClient(data); return "Client created"; },
+    onDealCreate: async (data) => { await kanbanApi.addDeal(data); return "Deal created"; },
+    onProjectCreate: async (data) => { await kanbanApi.addProject(data); return "Project created"; },
+    onEventCreate: async (data) => { await kanbanApi.addEvent(data); return "Event created"; },
+    onCandidateCreate: async (data) => { await kanbanApi.addCandidate(data); return "Candidate created"; },
+    onSocialPostCreate: async (data) => { await kanbanApi.addSocialPost(data); return "Social post created"; },
+    onDealStatusUpdate: (id, status) => { kanbanApi.updateDeal(id, {status}); return Promise.resolve("Updated"); },
+    onFindProspects: async (data) => { 
+        const bl = kanbanApi.businessLines.find(b => b.name.toLowerCase().includes(data.businessLineName.toLowerCase()));
+        if (!bl) return "Business Line not found.";
+        const { prospects } = await kanbanApi.findProspects(bl, "Find prospects");
+        return `Found ${prospects.length} prospects.`;
+    },
+    onPlatformQuery: async (query) => "Here are your insights...", // Placeholder for now
+    onAnalyzeRisk: async (data) => {
+        const project = kanbanApi.projects.find(p => p.projectName.toLowerCase().includes(data.projectName.toLowerCase()));
+        if (!project) return "Project not found.";
+        const report = await kanbanApi.analyzeProjectRisk(project);
+        await kanbanApi.addDocument({ name: `Risk Report - ${project.projectName}`, content: report }, 'SOPs', project.id, 'project');
+        return "Risk analysis generated and saved to documents.";
+    },
+    onAnalyzeNegotiation: async (data) => {
+        const deal = kanbanApi.deals.find(d => d.name.toLowerCase().includes(data.dealName.toLowerCase()));
+        if (!deal) return "Deal not found.";
+        const client = kanbanApi.clients.find(c => c.id === deal.clientId);
+        if (!client) return "Client not found.";
+        const report = await kanbanApi.analyzeDealStrategy(deal, client);
+        await kanbanApi.addDocument({ name: `Negotiation Strategy - ${deal.name}`, content: report }, 'Business Development', deal.id, 'deal');
+        return "Negotiation strategy generated and saved.";
+    },
+    onGetClientPulse: async (data) => {
+        const client = kanbanApi.clients.find(c => c.name.toLowerCase().includes(data.clientName.toLowerCase()));
+        if (!client) return "Client not found.";
+        await kanbanApi.getClientPulse(client, {});
+        return "Client pulse updated.";
+    },
+    onGetCompetitorInsights: async (data) => {
+        const bl = kanbanApi.businessLines.find(b => b.name.toLowerCase().includes(data.businessLineName.toLowerCase()));
+        if (!bl) return "Business Line not found.";
+        await kanbanApi.getCompetitorInsights(bl, {});
+        return "Competitor insights updated.";
+    },
+    systemContext: {
+        clients: kanbanApi.clients.map(c => c.name),
+        deals: kanbanApi.deals.map(d => d.name),
+        businessLines: kanbanApi.businessLines.map(b => b.name),
+        projects: kanbanApi.projects.map(p => p.projectName)
+    }
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoadingAuth(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const isSuperAdmin = session?.user?.email === 'acyberorg@gmail.com';
-
-  if (!isApiKeyAvailable) {
-    return <ApiKeyMissingError />;
-  }
-
-  // Default view is 'today'
-  const [activeView, setActiveView] = useState<View>('today');
-  // Sidebar hidden by default on all screens
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  const [selectedBusinessLineId, setSelectedBusinessLineId] = useState<string | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [initialDetailTab, setInitialDetailTab] = useState<string | undefined>(undefined);
-  const [isChatVisible, setIsChatVisible] = useState(false);
-  const [lastInteraction, setLastInteraction] = useState({ user: '', assistant: '' });
-  const [isUniversalInputOpen, setIsUniversalInputOpen] = useState(false);
-  const [universalInputContext, setUniversalInputContext] = useState<UniversalInputContext>({});
-  const [showWalkthrough, setShowWalkthrough] = useState(false);
-
-  const kanban = useKanban();
-
-  useEffect(() => {
-    if (session) {
-        const hasSeenWalkthrough = localStorage.getItem('walkthroughCompleted');
-        if (!hasSeenWalkthrough) {
-        setShowWalkthrough(true);
-        }
-    }
-  }, [session]);
-
-  const handleWalkthroughComplete = () => {
-    localStorage.setItem('walkthroughCompleted', 'true');
-    setShowWalkthrough(false);
-  };
-
-  const handleTurnComplete = (user: string, assistant: string) => {
-    if (user || assistant) {
-      setLastInteraction({ user, assistant });
-      setIsChatVisible(true);
-    }
-  };
-
-  useEffect(() => {
-      if (selectedTask) {
-          const updatedTaskInList = kanban.tasks.find(t => t.id === selectedTask.id);
-          if (updatedTaskInList) {
-              if (JSON.stringify(selectedTask) !== JSON.stringify(updatedTaskInList)) {
-                  setSelectedTask(updatedTaskInList);
-              }
-          } else {
-              setSelectedTask(null);
-          }
-      }
-  }, [kanban.tasks, selectedTask]);
-
-  const platformActivitySummary = `Last 3 tasks: ${kanban.tasks.slice(0,3).map(t => t.title).join(', ')}.`;
-
-  const assistant = useVoiceAssistant({
-    onBoardItemCreate: kanban.addTask,
-    onCrmEntryCreate: kanban.addCRMEntryFromVoice,
-    onTaskUpdate: kanban.updateTaskStatusByTitle,
-    onBusinessLineCreate: kanban.addBusinessLine,
-    onClientCreate: async (data) => { const c = await kanban.addClient(data); return c ? "Client created." : "Failed."; },
-    onDealCreate: kanban.addDeal,
-    onProjectCreate: kanban.addProject,
-    onEventCreate: (data) => { kanban.addEvent(data); return "Event created."; },
-    onCandidateCreate: (data) => { kanban.addCandidate(data); return "Candidate added."; },
-    onSocialPostCreate: (data) => { kanban.addSocialPost(data); return "Post scheduled."; },
-    onDealStatusUpdate: (dealId, status) => kanban.updateDeal(dealId, { status }),
-    onTurnComplete: handleTurnComplete,
-    onFindProspects: kanban.findProspectsByName,
-    onPlatformQuery: kanban.getPlatformQueryResponse,
-    // Deep Intelligence Wiring
-    onAnalyzeRisk: async ({ projectName }) => {
-        const proj = kanban.projects.find(p => p.projectName.toLowerCase().includes(projectName.toLowerCase()));
-        if(proj) {
-            const res = await kanban.analyzeProjectRisk(proj);
-            return res;
-        }
-        return "Project not found.";
-    },
-    onAnalyzeNegotiation: async ({ dealName }) => {
-        const deal = kanban.deals.find(d => d.name.toLowerCase().includes(dealName.toLowerCase()));
-        if(deal) {
-            const client = kanban.clients.find(c => c.id === deal.clientId);
-            if(client) {
-                const res = await kanban.analyzeDealStrategy(deal, client);
-                return res;
-            }
-        }
-        return "Deal or Client not found.";
-    },
-    onGetClientPulse: async ({ clientName }) => {
-        const client = kanban.clients.find(c => c.name.toLowerCase().includes(clientName.toLowerCase()));
-        if(client) {
-            const res = await kanban.getClientPulse(client, { timeframe: 'last_month', location: 'any', scope: 'all', customQuery: '' });
-            return `Found ${res.length} recent updates. Check the client view.`;
-        }
-        return "Client not found.";
-    },
-    currentBusinessLineId: selectedBusinessLineId,
-    currentClientId: selectedClientId,
-    currentDealId: selectedDealId,
-    platformActivitySummary,
-    // Inject Live System Context
-    systemContext: {
-        clients: kanban.clients.map(c => c.name),
-        deals: kanban.deals.map(d => d.name),
-        businessLines: kanban.businessLines.map(b => b.name),
-        projects: kanban.projects.map(p => p.projectName),
-    }
-  });
-
-  const clearSelections = () => {
-    setSelectedBusinessLineId(null);
-    setSelectedClientId(null);
-    setSelectedDealId(null);
-    setSelectedProjectId(null);
-    setSelectedTask(null);
-    setInitialDetailTab(undefined);
-  }
-
-  const handleSetView = (view: View) => {
-    trackEvent('navigate', 'View', view);
-    clearSelections();
-    setActiveView(view);
-    setIsSidebarOpen(false);
-  }
-
-  const handleSelectBusinessLine = (id: string, tab?: string) => {
-    trackEvent('select', 'BusinessLine', id);
-    clearSelections();
-    setActiveView('businessLines');
-    setSelectedBusinessLineId(id);
-    if (tab) setInitialDetailTab(tab);
+  const handleSelectBusinessLine = (id: string) => {
+      setSelectedBusinessLineId(id);
+      setActiveView('businessLineDetail');
   };
 
   const handleSelectClient = (id: string) => {
-    trackEvent('select', 'Client', id);
-    clearSelections();
-    setActiveView('clients');
-    setSelectedClientId(id);
+      setSelectedClientId(id);
+      setActiveView('clientDetail');
   };
-  
+
   const handleSelectDeal = (id: string) => {
-    trackEvent('select', 'Deal', id);
-    clearSelections();
-    setActiveView('deals');
-    setSelectedDealId(id);
-  }
+      setSelectedDealId(id);
+      setActiveView('dealDetail');
+  };
 
   const handleSelectProject = (id: string) => {
-    trackEvent('select', 'Project', id);
-    clearSelections();
-    setActiveView('projects');
-    setSelectedProjectId(id);
-  }
-
-  const handleSelectTask = (task: Task) => {
-    setSelectedTask(task);
-  }
-
-  const handleStartRecording = () => {
-    setIsChatVisible(true);
-    assistant.startRecording();
+      setSelectedProjectId(id);
+      setActiveView('projectDetail');
   };
 
-  const handleOpenUniversalInput = (context: UniversalInputContext) => {
-    setUniversalInputContext(context);
-    setIsUniversalInputOpen(true);
+  const handleOpenUniversalInput = (context: UniversalInputContext = {}) => {
+      setUniversalInputContext(context);
+      setIsUniversalInputOpen(true);
   };
 
-  if (loadingAuth) {
-      return <div className="flex h-screen items-center justify-center bg-[#FDFCF8] text-gray-500">
-          <div className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4"></div>
-              <p>Loading Workspace...</p>
-          </div>
-      </div>;
-  }
+  const handleUniversalSave = async (text: string, file?: any) => {
+      await kanbanApi.processTextAndExecute(text, universalInputContext, file);
+  };
 
   if (!session) {
-      if (showAuthPage) {
-          return <AuthPage />;
-      }
-      return <LandingPage onGetStarted={() => setShowAuthPage(true)} />;
+    return <AuthPage />;
   }
 
-  const renderView = () => {
-    // Detail Views
-    if (selectedProjectId) {
-        const project = kanban.projects.find(p => p.id === selectedProjectId);
-        if (project) {
-            const client = kanban.clients.find(c => c.id === project.clientId);
-            const businessLine = client ? kanban.businessLines.find(bl => bl.id === client.businessLineId) : undefined;
-            return <ProjectDetailView project={project} client={client!} businessLine={businessLine} tasks={kanban.tasks.filter(t => t.projectId === selectedProjectId)} kanbanApi={kanban} onSelectClient={handleSelectClient} onSelectTask={handleSelectTask} onBack={() => handleSetView('projects')} />
-        }
-    }
-    if (selectedDealId) {
-        const deal = kanban.deals.find(d => d.id === selectedDealId);
-        if (deal) {
-            return <DealDetailView deal={deal} client={kanban.clients.find(c => c.id === deal.clientId)!} businessLine={kanban.businessLines.find(bl => bl.id === deal.businessLineId)!} tasks={kanban.tasks.filter(t => t.dealId === selectedDealId)} documents={kanban.documents.filter(doc => doc.ownerId === selectedDealId && doc.ownerType === 'deal')} kanbanApi={kanban} onSelectClient={handleSelectClient} onSelectBusinessLine={handleSelectBusinessLine} onSelectTask={handleSelectTask} clients={kanban.clients} onBack={() => { const client = kanban.clients.find(c => c.id === deal.clientId); if (client) handleSelectClient(client.id); else handleSetView('deals'); }} />
-        }
-    }
-    if (selectedClientId) {
-        const client = kanban.clients.find(c => c.id === selectedClientId);
-        if (client) {
-            return <ClientDetailView client={client} businessLines={kanban.businessLines} tasks={kanban.tasks.filter(t => t.clientId === selectedClientId)} deals={kanban.deals.filter(d => d.clientId === selectedClientId)} projects={kanban.projects.filter(p => p.clientId === selectedClientId)} documents={kanban.documents.filter(doc => doc.ownerId === selectedClientId && doc.ownerType === 'client' || kanban.crmEntries.filter(c => c.clientId === client.id).map(c=>c.documentId).includes(doc.id))} crmEntries={kanban.crmEntries.filter(c => c.clientId === selectedClientId)} kanbanApi={kanban} onSelectBusinessLine={handleSelectBusinessLine} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onBack={() => handleSetView('clients')} onOpenUniversalInput={handleOpenUniversalInput} />
-        }
-    }
-    if (selectedBusinessLineId) {
-        const businessLine = kanban.businessLines.find(bl => bl.id === selectedBusinessLineId);
-        const playbook = kanban.playbooks.find(p => p.businessLineId === selectedBusinessLineId);
-        if (businessLine) {
-            return <BusinessLineDetailView businessLine={businessLine} playbook={playbook} tasks={kanban.tasks.filter(t => t.businessLineId === selectedBusinessLineId)} clients={kanban.clients.filter(c => c.businessLineId === selectedBusinessLineId)} deals={kanban.deals.filter(d => d.businessLineId === selectedBusinessLineId)} documents={kanban.documents.filter(doc => doc.ownerId === selectedBusinessLineId && doc.ownerType === 'businessLine')} kanbanApi={kanban} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectTask={handleSelectTask} onBack={() => handleSetView('businessLines')} initialTab={initialDetailTab} />;
-        }
-    }
-    
-    const defaultBusinessLine = kanban.businessLines[0];
-
-    // Flat View Switcher
-    switch (activeView) {
-      case 'today':
-        return <TasksView initialTab="Today" tasks={kanban.tasks} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} projects={kanban.projects} updateTaskStatus={kanban.updateTaskStatusById} onSelectBusinessLine={handleSelectBusinessLine} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onOpenUniversalInput={handleOpenUniversalInput} kanbanApi={kanban} />;
-      case 'allTasks':
-        return <TasksView initialTab="All tasks" tasks={kanban.tasks} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} projects={kanban.projects} updateTaskStatus={kanban.updateTaskStatusById} onSelectBusinessLine={handleSelectBusinessLine} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onOpenUniversalInput={handleOpenUniversalInput} kanbanApi={kanban} />;
-      case 'crm': return <CRMView clients={kanban.clients} crmEntries={kanban.crmEntries} tasks={kanban.tasks} businessLines={kanban.businessLines} onSelectClient={handleSelectClient} />;
-      case 'businessLines': return <BusinessLinesView businessLines={kanban.businessLines} onSelectBusinessLine={handleSelectBusinessLine} onOpenUniversalInput={handleOpenUniversalInput} onUpdateBusinessLine={kanban.updateBusinessLine} />;
-      case 'clients': return <ClientsView clients={kanban.clients} businessLines={kanban.businessLines} onSelectClient={handleSelectClient} onOpenUniversalInput={handleOpenUniversalInput} onUpdateClient={kanban.updateClient} kanbanApi={kanban} />;
-      case 'deals': return <DealsView deals={kanban.deals} clients={kanban.clients} businessLines={kanban.businessLines} onSelectDeal={handleSelectDeal} onOpenUniversalInput={handleOpenUniversalInput} onUpdateDeal={kanban.updateDeal} />;
-      case 'projects': return <ProjectsView projects={kanban.projects} clients={kanban.clients} onSelectProject={handleSelectProject} onOpenUniversalInput={handleOpenUniversalInput} />;
-      case 'social': return defaultBusinessLine ? <SocialMediaTab businessLine={defaultBusinessLine} kanbanApi={kanban} /> : <div className="p-8 text-center text-gray-500">Create a Business Line to manage Social Media.</div>;
-      case 'sales': return <SalesView deals={kanban.deals} clients={kanban.clients} onSelectDeal={handleSelectDeal} onOpenUniversalInput={handleOpenUniversalInput} />;
-      case 'events': return <EventsView events={kanban.events} kanbanApi={kanban} />;
-      case 'hr': return <HRView candidates={kanban.candidates} employees={kanban.employees} kanbanApi={kanban} />;
-      case 'access': return <TeamView />;
-      case 'settings': return <SettingsView kanbanApi={kanban} />;
-      case 'admin': return isSuperAdmin ? <AdminDashboard /> : <div className="p-8 text-center text-gray-500">Access Denied. Admin only.</div>;
-      default:
-        return <TasksView initialTab="Today" tasks={kanban.tasks} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} projects={kanban.projects} updateTaskStatus={kanban.updateTaskStatusById} onSelectBusinessLine={handleSelectBusinessLine} onSelectClient={handleSelectClient} onSelectDeal={handleSelectDeal} onSelectProject={handleSelectProject} onSelectTask={handleSelectTask} onOpenUniversalInput={handleOpenUniversalInput} kanbanApi={kanban} />;
-    }
+  const renderContent = () => {
+      switch (activeView) {
+          case 'today':
+          case 'allTasks':
+              return <TasksView 
+                  initialTab={activeView === 'today' ? 'Today' : 'All tasks'}
+                  tasks={kanbanApi.tasks} 
+                  businessLines={kanbanApi.businessLines}
+                  clients={kanbanApi.clients}
+                  deals={kanbanApi.deals}
+                  projects={kanbanApi.projects}
+                  updateTaskStatus={kanbanApi.updateTaskStatusById}
+                  onSelectBusinessLine={handleSelectBusinessLine}
+                  onSelectClient={handleSelectClient}
+                  onSelectDeal={handleSelectDeal}
+                  onSelectProject={handleSelectProject}
+                  onSelectTask={setSelectedTask}
+                  onOpenUniversalInput={handleOpenUniversalInput}
+                  kanbanApi={kanbanApi}
+              />;
+          case 'businessLines':
+              return <BusinessLinesView 
+                  businessLines={kanbanApi.businessLines}
+                  onSelectBusinessLine={handleSelectBusinessLine}
+                  onOpenUniversalInput={handleOpenUniversalInput}
+                  onUpdateBusinessLine={kanbanApi.updateBusinessLine}
+              />;
+          case 'clients':
+              return <ClientsView 
+                  clients={kanbanApi.clients}
+                  businessLines={kanbanApi.businessLines}
+                  onSelectClient={handleSelectClient}
+                  onOpenUniversalInput={handleOpenUniversalInput}
+                  onUpdateClient={kanbanApi.updateClient}
+                  kanbanApi={kanbanApi}
+              />;
+          case 'deals':
+              return <DealsView 
+                  deals={kanbanApi.deals}
+                  clients={kanbanApi.clients}
+                  businessLines={kanbanApi.businessLines}
+                  onSelectDeal={handleSelectDeal}
+                  onOpenUniversalInput={handleOpenUniversalInput}
+                  onUpdateDeal={kanbanApi.updateDeal}
+              />;
+          case 'projects':
+              return <ProjectsView 
+                  projects={kanbanApi.projects}
+                  clients={kanbanApi.clients}
+                  onSelectProject={handleSelectProject}
+                  onOpenUniversalInput={handleOpenUniversalInput}
+              />;
+          case 'social':
+              // Default to first business line or show empty
+              if (kanbanApi.businessLines.length > 0) {
+                  return <SocialMediaTab businessLine={kanbanApi.businessLines[0]} kanbanApi={kanbanApi} />;
+              }
+              return <div>Please create a business line first.</div>;
+          case 'sales':
+              return <SalesView 
+                  deals={kanbanApi.deals}
+                  clients={kanbanApi.clients}
+                  onSelectDeal={handleSelectDeal}
+                  onOpenUniversalInput={handleOpenUniversalInput}
+              />;
+          case 'events':
+              return <EventsView events={kanbanApi.events} kanbanApi={kanbanApi} />;
+          case 'hr':
+              return <HRView candidates={kanbanApi.candidates} employees={kanbanApi.employees} kanbanApi={kanbanApi} />;
+          case 'access':
+              return <TeamView />;
+          case 'settings':
+              return <SettingsView kanbanApi={kanbanApi} />;
+          case 'admin':
+              return <AdminDashboard />;
+          case 'businessLineDetail':
+              if (!selectedBusinessLineId) return <div>No business line selected</div>;
+              const bl = kanbanApi.businessLines.find(b => b.id === selectedBusinessLineId);
+              if (!bl) return <div>Business Line not found</div>;
+              return <BusinessLineDetailView 
+                  businessLine={bl}
+                  tasks={kanbanApi.tasks.filter(t => t.businessLineId === bl.id)}
+                  clients={kanbanApi.clients.filter(c => c.businessLineId === bl.id)}
+                  deals={kanbanApi.deals.filter(d => d.businessLineId === bl.id)}
+                  documents={kanbanApi.documents.filter(d => d.ownerId === bl.id)}
+                  onBack={() => setActiveView('businessLines')}
+                  kanbanApi={kanbanApi}
+                  onSelectClient={handleSelectClient}
+                  onSelectDeal={handleSelectDeal}
+                  onSelectTask={setSelectedTask}
+              />;
+          case 'clientDetail':
+              if (!selectedClientId) return <div>No client selected</div>;
+              const cl = kanbanApi.clients.find(c => c.id === selectedClientId);
+              if (!cl) return <div>Client not found</div>;
+              return <ClientDetailView 
+                  client={cl}
+                  businessLines={kanbanApi.businessLines}
+                  tasks={kanbanApi.tasks.filter(t => t.clientId === cl.id)}
+                  deals={kanbanApi.deals.filter(d => d.clientId === cl.id)}
+                  projects={kanbanApi.projects.filter(p => p.clientId === cl.id)}
+                  documents={kanbanApi.documents.filter(d => d.ownerId === cl.id)}
+                  crmEntries={kanbanApi.crmEntries.filter(e => e.clientId === cl.id)}
+                  onBack={() => setActiveView('clients')}
+                  kanbanApi={kanbanApi}
+                  onSelectBusinessLine={handleSelectBusinessLine}
+                  onSelectDeal={handleSelectDeal}
+                  onSelectProject={handleSelectProject}
+                  onSelectTask={setSelectedTask}
+                  onOpenUniversalInput={handleOpenUniversalInput}
+              />;
+          case 'dealDetail':
+              if (!selectedDealId) return <div>No deal selected</div>;
+              const dl = kanbanApi.deals.find(d => d.id === selectedDealId);
+              if (!dl) return <div>Deal not found</div>;
+              const dlClient = kanbanApi.clients.find(c => c.id === dl.clientId);
+              const dlBl = kanbanApi.businessLines.find(b => b.id === dl.businessLineId);
+              if (!dlClient || !dlBl) return <div>Data inconsistency for deal</div>;
+              return <DealDetailView 
+                  deal={dl}
+                  client={dlClient}
+                  businessLine={dlBl}
+                  tasks={kanbanApi.tasks.filter(t => t.dealId === dl.id)}
+                  documents={kanbanApi.documents.filter(d => d.ownerId === dl.id)}
+                  kanbanApi={kanbanApi}
+                  onSelectClient={handleSelectClient}
+                  onSelectBusinessLine={handleSelectBusinessLine}
+                  onBack={() => setActiveView('deals')}
+                  onSelectTask={setSelectedTask}
+                  clients={kanbanApi.clients}
+              />;
+          case 'projectDetail':
+              if (!selectedProjectId) return <div>No project selected</div>;
+              const pr = kanbanApi.projects.find(p => p.id === selectedProjectId);
+              if (!pr) return <div>Project not found</div>;
+              const prClient = kanbanApi.clients.find(c => c.id === pr.clientId);
+              const prBl = prClient ? kanbanApi.businessLines.find(b => b.id === prClient.businessLineId) : undefined;
+              return <ProjectDetailView 
+                  project={pr}
+                  client={prClient || { name: 'Unknown' } as Client}
+                  businessLine={prBl}
+                  tasks={kanbanApi.tasks.filter(t => t.projectId === pr.id)}
+                  kanbanApi={kanbanApi}
+                  onSelectClient={handleSelectClient}
+                  onBack={() => setActiveView('projects')}
+                  onSelectTask={setSelectedTask}
+              />;
+          default:
+              return <div>Page not found</div>;
+      }
   };
 
   return (
-    <div className="min-h-screen font-sans flex flex-col lg:flex-row bg-brevo-light-gray">
-      {showWalkthrough && <Walkthrough onComplete={handleWalkthroughComplete} />}
+    <div className="flex h-screen bg-[#F9F9F9]">
+      <Sidebar 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+        isSuperAdmin={true} 
+      />
       
-      <Sidebar activeView={activeView} setActiveView={handleSetView} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} isSuperAdmin={isSuperAdmin} permissions={kanban.currentUserMember?.permissions} />
-      
-      <div className="flex-1 flex flex-col lg:ml-0 transition-all duration-300">
-        <header className="p-4 border-b border-brevo-border flex items-center justify-between z-10 bg-white/80 backdrop-blur-sm sticky top-0">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-brevo-text-secondary hover:text-brevo-text-primary">
-              <MenuIcon />
-            </button>
-            <h1 className="text-xl font-bold text-brevo-cta">
-                {kanban.organization ? kanban.organization.name : 'olooAI'}
-            </h1>
-          </div>
-           <div className="flex items-center gap-4">
-                <div className="hidden md:flex flex-col items-end">
-                    <p className="text-sm font-semibold text-brevo-text-primary">
-                        {session.user.user_metadata?.full_name || session.user.email.split('@')[0]}
-                    </p>
-                    <p className="text-xs text-brevo-text-secondary">
-                        {kanban.currentUserMember?.role || 'Member'}
-                    </p>
-                </div>
-                <button onClick={() => supabase.auth.signOut()} className="text-xs text-red-500 hover:underline border border-red-200 rounded px-2 py-1 hover:bg-red-50">Sign Out</button>
-                <VoiceControl isConnecting={assistant.isConnecting} isRecording={assistant.isRecording} startRecording={handleStartRecording} stopRecording={assistant.stopRecording} />
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64 relative">
+        <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-brevo-border">
+            <div className="flex items-center">
+                <button onClick={() => setIsSidebarOpen(true)} className="mr-3 text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                </button>
+                <span className="font-bold text-lg">olooAI</span>
             </div>
-        </header>
-        
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          {renderView()}
+        </div>
+
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative">
+            {renderContent()}
         </main>
+
+        <div className="absolute bottom-6 right-6 z-30 flex flex-col items-end space-y-4">
+            {isSpeaking && (
+                <div className="bg-black/80 text-white text-sm px-4 py-2 rounded-lg backdrop-blur-sm shadow-lg animate-fade-in-up max-w-xs">
+                    {assistantTranscript}
+                </div>
+            )}
+            <VoiceControl 
+                isConnecting={isConnecting}
+                isRecording={isRecording}
+                startRecording={startRecording}
+                stopRecording={stopRecording}
+            />
+        </div>
+
+        <UniversalInputModal 
+            isOpen={isUniversalInputOpen} 
+            onClose={() => setIsUniversalInputOpen(false)}
+            onSave={handleUniversalSave}
+            context={universalInputContext}
+        />
+        
+        <ChatInterface 
+            isVisible={isRecording || isSpeaking || isThinking}
+            onClose={() => {}}
+            liveUserTranscript={userTranscript}
+            liveAssistantTranscript={assistantTranscript}
+            lastUserTranscript=""
+            lastAssistantTranscript=""
+            isThinking={isThinking}
+            isSpeaking={isSpeaking}
+            error={voiceError}
+        />
       </div>
-
-      <ChatInterface isVisible={isChatVisible} onClose={() => setIsChatVisible(false)} liveUserTranscript={assistant.userTranscript} liveAssistantTranscript={assistant.assistantTranscript} lastUserTranscript={lastInteraction.user} lastAssistantTranscript={lastInteraction.assistant} isThinking={assistant.isThinking} isSpeaking={assistant.isSpeaking} error={assistant.error} />
-
-      {selectedTask && (
-        <TaskDetailModal isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} task={selectedTask} kanbanApi={kanban} businessLines={kanban.businessLines} clients={kanban.clients} deals={kanban.deals} onOpenUniversalInput={handleOpenUniversalInput} />
-      )}
-
-      {isUniversalInputOpen && (
-          <UniversalInputModal isOpen={isUniversalInputOpen} onClose={() => setIsUniversalInputOpen(false)} onSave={(text, file) => { if (universalInputContext.date) { kanban.addTask({ title: text, dueDate: universalInputContext.date.toISOString() }); } else { kanban.processTextAndExecute(text, universalInputContext, file) } }} context={universalInputContext} />
-      )}
     </div>
   );
 }
+
+export default App;

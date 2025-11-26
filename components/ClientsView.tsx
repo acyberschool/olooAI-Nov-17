@@ -9,7 +9,7 @@ interface ClientsViewProps {
   businessLines: BusinessLine[];
   onSelectClient: (id: string) => void;
   onOpenUniversalInput: (context: UniversalInputContext) => void;
-  onUpdateClient: (id: string, data: Partial<Omit<Client, 'id'>>) => Promise<string> | string;
+  onUpdateClient: (id: string, data: Partial<Omit<Client, 'id'>>) => Promise<string> | string | void;
   kanbanApi?: ReturnType<typeof useKanban>; // Optional for lead scoring
 }
 

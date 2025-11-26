@@ -229,6 +229,18 @@ const getClientPulseDeclaration: GeminiFunctionDeclaration = {
     },
 };
 
+const getCompetitorInsightsDeclaration: GeminiFunctionDeclaration = {
+    name: 'getCompetitorInsights',
+    parameters: {
+        type: GeminiType.OBJECT,
+        description: 'Identifies competitors and market trends for a business line.',
+        properties: {
+            businessLineName: { type: GeminiType.STRING },
+        },
+        required: ['businessLineName'],
+    },
+};
+
 const createCrmEntryDeclaration: GeminiFunctionDeclaration = {
   name: 'createCrmEntry',
   parameters: {
@@ -258,6 +270,7 @@ const createBoardItemDeclaration: GeminiFunctionDeclaration = {
       clientName: { type: GeminiType.STRING, description: 'Client name.' },
       dealName: { type: GeminiType.STRING, description: 'Deal name.' },
       businessLineName: { type: GeminiType.STRING, description: 'Business Line name.' },
+      assigneeName: { type: GeminiType.STRING, description: 'Name of the team member to assign (e.g., "@John").' },
     },
     required: ['title'], 
   },
@@ -510,6 +523,7 @@ export const assistantTools = [{ functionDeclarations: [
     analyzeRiskDeclaration,
     analyzeNegotiationDeclaration,
     getClientPulseDeclaration,
+    getCompetitorInsightsDeclaration,
     logPaymentDeclaration,
     refineTaskChecklistDeclaration,
     generateSocialImageDeclaration,
